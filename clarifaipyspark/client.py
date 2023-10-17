@@ -22,6 +22,7 @@ class ClarifaiPySpark(BaseClient):
     self.app_id = app_id
     super().__init__(user_id=user_id, app_id=app_id)
 
+
   def dataset(self, dataset_id):
     """Initializes the dataset method with dataset_id.
 

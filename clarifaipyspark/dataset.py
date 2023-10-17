@@ -4,6 +4,7 @@ from clarifai.client.input import Inputs
 from clarifai.client.user import User
 from google.protobuf.json_format import MessageToJson
 from pyspark.sql import SparkSession
+import json
 
 
 class Dataset(Dataset):
@@ -27,6 +28,7 @@ class Dataset(Dataset):
     self.app_id = app_id
     self.dataset_id = dataset_id
     super().__init__(user_id=user_id, app_id=app_id, dataset_id=dataset_id)
+
 
   def upload_dataset_from_csv(self,
                               csv_path: str = "",
@@ -53,16 +55,17 @@ class Dataset(Dataset):
 
     """
     ### TODO: Can input column names & extract them to convert to our csv format
-    super().upload_from_csv(
+    self.upload_from_csv(
         csv_path=csv_path,
         input_type=input_type,
         csv_type=csv_type,
         labels=labels,
         chunk_size=chunk_size)
 
-  def upload_from_folder(self,
-                         folder_path: str = "",
-                         input_type: str = 'text',
+
+  def upload_dataset_from_folder(self,
+                         folder_path: str,
+                         input_type: str,
                          labels: bool = False,
                          chunk_size: int = 128) -> None:
     """Uploads dataset from folder into clarifai app.
@@ -80,8 +83,9 @@ class Dataset(Dataset):
         If label is true, then folder name is class name (label)
     """
 
-    super().upload_from_folder(
+    self.upload_from_folder(
         folder_path=folder_path, input_type=input_type, labels=labels, chunk_size=chunk_size)
+
 
   def upload_dataset_from_dataloader(self,
                                      task: str,
@@ -100,7 +104,8 @@ class Dataset(Dataset):
 
     Example: TODO
     """
-    super().upload_dataset(task, split, module_dir, dataset_loader, chunk_size)
+    self.upload_dataset(task, split, module_dir, dataset_loader, chunk_size)
+
 
   def upload_dataset_from_table(self,
                                 table_path: str,
@@ -110,7 +115,7 @@ class Dataset(Dataset):
                                 table_type: str,
                                 labels: bool,
                                 module_dir: str = None,
-                                dataset_loader=None,
+                                dataset_loader = None,
                                 chunk_size: int = 128) -> None:
     """upload dataset into clarifai app from spark tables.
 
@@ -131,7 +136,7 @@ class Dataset(Dataset):
     """
 
     if dataset_loader:
-      super().upload_dataset(task, split, module_dir, dataset_loader, chunk_size)
+      self.upload_dataset(task, split, module_dir, dataset_loader, chunk_size)
 
     else:
       # df = sqlContext.table(table_path)
@@ -144,12 +149,13 @@ class Dataset(Dataset):
       csv_path = table_path.replace(".delta", ".csv")
       spark.sql("SELECT * FROM temporary_view").write.option("header",
                                                              "true").format("csv").save(csv_path)
-      super().upload_from_csv(
+      self.upload_from_csv(
           csv_path=csv_path,
           input_type=input_type,
           csv_type=table_type,
           labels=labels,
           chunk_size=chunk_size)
+
 
   def list_inputs_from_dataset(self,
                                dataset_id: str = None,
@@ -173,6 +179,7 @@ class Dataset(Dataset):
     return list(
         input_obj.list_inputs(dataset_id=dataset_id, input_type=input_type, per_page=per_page))
 
+
   def list_annotations(self, dataset_id: str = None, per_page: int = None, input_type: str = None):
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
 
@@ -194,6 +201,7 @@ class Dataset(Dataset):
         input_obj.list_inputs(dataset_id=dataset_id, input_type=input_type, per_page=per_page))
     return list(input_obj.list_annotations(batch_input=all_inputs))
 
+
   def export_annotations_to_dataframe(self):
     """Export all the annotations from clarifai App into spark dataframe.
 
@@ -206,10 +214,18 @@ class Dataset(Dataset):
     annotation_list = []
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    all_inputs = list(input_obj.list_inputs(dataset_id=dataset_id))
-    response = input_obj.list_annotations(batch_input=all_inputs)
-    annotation_list.append(MessageToJson(response.annotations))
-    #Need to get the details of rest of the columns (ID, URL), annotations should be appended along with the existing dataframe created while dataset upload
-    data = [annotation_list]
-    df = spark.createDataFrame(data)
+    all_inputs = list(input_obj.list_inputs(dataset_id=self.dataset_id))
+    response = list(input_obj.list_annotations(batch_input=all_inputs))
+    for an in response:
+      temp = {}
+      temp['annotation'] = json.loads(MessageToJson(an.data))
+      if not temp['annotation'] or temp['annotation']=='{}' or temp['annotation']=={}:
+          continue
+      temp['id'] = an.id
+      temp['user_id'] = an.user_id
+      temp['input_id'] = an.input_id
+      temp['created_at'] = spark.to_datetime(float(an.created_at.seconds), unit='s')
+      temp['modified_at'] = spark.to_datetime(float(an.modified_at.seconds), unit='s')
+      annotation_list.append(temp)
+    df = spark.createDataFrame(annotation_list)
     return df
