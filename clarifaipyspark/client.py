@@ -1,6 +1,7 @@
 from clarifai.client.app import App
 from clarifai.client.base import BaseClient
 from clarifai.client.user import User
+from dataset import Dataset
 
 
 class ClarifaiPySpark(BaseClient):
@@ -35,8 +36,10 @@ class ClarifaiPySpark(BaseClient):
 
     self.dataset_id = dataset_id
     try:
-      self.dataset = self.app.dataset(dataset_id=dataset_id)
+      self.app.dataset(dataset_id=dataset_id)
     except:
       print("Creating a new dataset")
-      self.dataset = self.app.create_dataset(dataset_id=dataset_id)
+      self.app.create_dataset(dataset_id=dataset_id)
+    
+    self.dataset = Dataset(dataset_id=dataset_id, user_id=self.user_id, app_id=self.app_id)
     return self.dataset
