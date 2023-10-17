@@ -180,7 +180,7 @@ class Dataset(Dataset):
         input_obj.list_inputs(dataset_id=dataset_id, input_type=input_type, per_page=per_page))
 
 
-  def list_annotations(self, dataset_id: str = None, per_page: int = None, input_type: str = None):
+  def list_annotations(self, per_page: int = None, input_type: str = None):
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
 
     Args:
@@ -198,7 +198,7 @@ class Dataset(Dataset):
     ### input_ids: list of input_ids for which user wants annotations
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     all_inputs = list(
-        input_obj.list_inputs(dataset_id=dataset_id, input_type=input_type, per_page=per_page))
+        input_obj.list_inputs(dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
     return list(input_obj.list_annotations(batch_input=all_inputs))
 
 
