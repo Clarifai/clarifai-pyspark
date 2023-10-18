@@ -1,0 +1,3 @@
+clarifaipyspark.egg-info
+*.ipynb
+clarifaipyspark/__pycache__/
