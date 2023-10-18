@@ -17,8 +17,6 @@ class ClarifaiPySpark(BaseClient):
 
     self.user = User(user_id=user_id)
     self.app = App(app_id=app_id)
-    #Inputs object - for listannotations
-    #input_obj = User(user_id="user_id").app(app_id="app_id").inputs()
     self.user_id = user_id
     self.app_id = app_id
     super().__init__(user_id=user_id, app_id=app_id)
