@@ -92,7 +92,7 @@ class Dataset(Dataset):
     self.upload_from_folder(
         folder_path=folder_path, input_type=input_type, labels=labels, chunk_size=chunk_size)
 
-   def get_inputs_from_dataframe(self,
+  def get_inputs_from_dataframe(self,
                               dataframe,
                               input_type: str ,
                               df_type: str ,
