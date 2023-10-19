@@ -91,41 +91,7 @@ class Dataset(Dataset):
     self.upload_from_folder(
         folder_path=folder_path, input_type=input_type, labels=labels, chunk_size=chunk_size)
 
-  
-
-  def upload_from_dataframe(self,
-                          dataframe,
-                          input_type: str,
-                          df_type: str = None,
-                          labels: bool = True,
-                          chunk_size: int = 128) -> None:
-
-    if input_type not in ['image', 'text', 'video', 'audio']:
-      raise UserError('Invalid input type, it should be image,text,audio or video')
-    
-    if df_type not in ['raw', 'url', 'file_path']:
-      raise UserError('Invalid csv type, it should be raw, url or file_path')
-
-    if df_type == 'raw' and input_type != 'text':
-      raise UserError('Only text input type is supported for raw csv type')
-    
-    if not isinstance(dataframe, SparkDataFrame):
-        raise UserError('dataframe should be a Spark DataFrame')
-    
-    chunk_size = min(128, chunk_size)
-    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    input_protos = get_inputs_from_dataframe(
-        dataframe=dataframe,
-        df_type=df_type,
-        input_type=input_type,
-        dataset_id=self.dataset_id,
-        labels=labels)
-    return (input_obj._bulk_upload(inputs=input_protos, chunk_size=chunk_size))
-
-
-
-
-  def get_inputs_from_dataframe(self,
+   def get_inputs_from_dataframe(self,
                               dataframe,
                               input_type: str ,
                               df_type: str ,
@@ -200,7 +166,34 @@ class Dataset(Dataset):
 
     return input_protos
 
+  def upload_from_dataframe(self,
+                          dataframe,
+                          input_type: str,
+                          df_type: str = None,
+                          labels: bool = True,
+                          chunk_size: int = 128) -> None:
 
+    if input_type not in ['image', 'text', 'video', 'audio']:
+      raise UserError('Invalid input type, it should be image,text,audio or video')
+    
+    if df_type not in ['raw', 'url', 'file_path']:
+      raise UserError('Invalid csv type, it should be raw, url or file_path')
+
+    if df_type == 'raw' and input_type != 'text':
+      raise UserError('Only text input type is supported for raw csv type')
+    
+    if not isinstance(dataframe, SparkDataFrame):
+        raise UserError('dataframe should be a Spark DataFrame')
+    
+    chunk_size = min(128, chunk_size)
+    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
+    input_protos = self.get_inputs_from_dataframe(
+        dataframe=dataframe,
+        df_type=df_type,
+        input_type=input_type,
+        dataset_id=self.dataset_id,
+        labels=labels)
+    return (input_obj._bulk_upload(inputs=input_protos, chunk_size=chunk_size))
 
 
 
