@@ -275,7 +275,6 @@ class Dataset(Dataset):
 
 
   def list_inputs_from_dataset(self,
-                               dataset_id: str = None,
                                per_page: int = None,
                                input_type: str = None):
     """Lists all the inputs from the app.
@@ -294,7 +293,7 @@ class Dataset(Dataset):
         """
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     return list(
-        input_obj.list_inputs(dataset_id=dataset_id, input_type=input_type, per_page=per_page))
+        input_obj.list_inputs(dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
 
 
   def list_annotations(self, per_page: int = None, input_type: str = None):
