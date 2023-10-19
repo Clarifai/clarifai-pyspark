@@ -9,6 +9,7 @@ from google.protobuf.json_format import MessageToJson
 from google.protobuf.struct_pb2 import Struct
 from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame as SparkDataFrame
+import requests
 
 
 
@@ -345,3 +346,14 @@ class Dataset(Dataset):
       annotation_list.append(temp)
     df = spark.createDataFrame(annotation_list)
     return df
+  
+
+  def export_images_to_volume(path, input_response):
+    for resp in input_response:
+        imgid = resp.id
+        ext = resp.data.image.image_info.format
+        url = resp.data.image.url
+        img_name = path+'/'+imgid+'.'+ext.lower()
+        response = requests.get(url)
+        with open(img_name, "wb") as f:
+            f.write(response.content)
