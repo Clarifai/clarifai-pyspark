@@ -1,10 +1,15 @@
+import json
+import uuid
+from typing import List
 from clarifai.client.app import App
 from clarifai.client.dataset import Dataset
 from clarifai.client.input import Inputs
 from clarifai.client.user import User
 from google.protobuf.json_format import MessageToJson
+from google.protobuf.struct_pb2 import Struct
 from pyspark.sql import SparkSession
-import json
+from pyspark.sql import DataFrame as SparkDataFrame
+
 
 
 class Dataset(Dataset):
@@ -85,6 +90,118 @@ class Dataset(Dataset):
 
     self.upload_from_folder(
         folder_path=folder_path, input_type=input_type, labels=labels, chunk_size=chunk_size)
+
+  
+
+  def upload_from_dataframe(self,
+                          dataframe,
+                          input_type: str,
+                          df_type: str = None,
+                          labels: bool = True,
+                          chunk_size: int = 128) -> None:
+
+    if input_type not in ['image', 'text', 'video', 'audio']:
+      raise UserError('Invalid input type, it should be image,text,audio or video')
+    
+    if df_type not in ['raw', 'url', 'file_path']:
+      raise UserError('Invalid csv type, it should be raw, url or file_path')
+
+    if df_type == 'raw' and input_type != 'text':
+      raise UserError('Only text input type is supported for raw csv type')
+    
+    if not isinstance(dataframe, SparkDataFrame):
+        raise UserError('dataframe should be a Spark DataFrame')
+    
+    chunk_size = min(128, chunk_size)
+    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
+    input_protos = get_inputs_from_dataframe(
+        dataframe=dataframe,
+        df_type=df_type,
+        input_type=input_type,
+        dataset_id=self.dataset_id,
+        labels=labels)
+    return (input_obj._bulk_upload(inputs=input_protos, chunk_size=chunk_size))
+
+
+
+
+  def get_inputs_from_dataframe(self,
+                              dataframe,
+                              input_type: str ,
+                              df_type: str ,
+                              dataset_id: str = None,
+                              labels: str = True) -> List['Text']:
+    input_protos = []
+    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
+
+    for row in dataframe.rdd.collect():
+        
+        if labels:
+          labels_list = row["concepts"]
+          labels =labels_list if len(row['concepts']) > 0 else None
+        else:
+          labels = None
+
+        if 'metadata' in dataframe.columns:
+          if len(row['metadata']) > 0:
+            metadata_str = row['metadata']
+            try:
+              metadata_dict = json.loads(metadata_str)
+            except json.decoder.JSONDecodeError:
+              raise UserError("metadata column in CSV file should be a valid json")
+            metadata = Struct()
+            metadata.update(metadata_dict)
+          else:
+            metadata = None
+        else:
+          metadata = None
+        
+        if 'geopoints' in dataframe.columns:
+          if len(row['geopoints']) > 0:
+            geo_points = row['geopoints'].split(',')
+            geo_points = [float(geo_point) for geo_point in geo_points]
+            geo_info = geo_points if len(geo_points) == 2 else UserError(
+                "geopoints column in CSV file should have longitude,latitude")
+          else:
+            geo_info = None
+        else:
+          geo_info = None
+
+        input_id = uuid.uuid4().hex
+        text = row["input"] if input_type == 'text' else None
+        image = row['input'] if input_type == 'image' else None
+        video = row['input'] if input_type == 'video' else None
+        audio = row['input'] if input_type == 'audio' else None
+
+        if df_type == 'raw':
+          input_protos.append(input_obj.get_text_input(
+                  input_id=input_id, raw_text=text, dataset_id=dataset_id, labels=labels,geo_info=geo_info))
+        elif df_type == 'url':
+          input_protos.append(input_obj.get_input_from_url(
+                  input_id=input_id,
+                  image_url=image,
+                  text_url=text,
+                  audio_url=audio,
+                  video_url=video,
+                  dataset_id=dataset_id,
+                  labels=labels,
+                  geo_info=geo_info))
+        else:
+          input_protos.append(
+            input_obj.get_input_from_file(
+                  input_id=input_id,
+                  image_file=image,
+                  text_file=text,
+                  audio_file=audio,
+                  video_file=video,
+                  dataset_id=dataset_id,
+                  labels=labels,
+                  geo_info=geo_info))
+
+    return input_protos
+
+
+
 
 
   def upload_dataset_from_dataloader(self,
