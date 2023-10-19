@@ -102,7 +102,6 @@ class Dataset(Dataset):
     input_obj = Inputs(user_id=self.input_id, app_id=self.app_id)
 
     for row in dataframe.collect():
-
       if labels:
         labels_list = row["concepts"]
         labels = labels_list if len(row['concepts']) > 0 else None
@@ -112,7 +111,6 @@ class Dataset(Dataset):
       if 'metadata' in dataframe.columns:
         if row['metadata'] is not None and len(row['metadata']) > 0:
           metadata_str = row['metadata'].replace("'", '"')
-          print((metadata_str))
           try:
             metadata_dict = json.loads(metadata_str)
           except json.decoder.JSONDecodeError:
@@ -140,7 +138,6 @@ class Dataset(Dataset):
       image = row['input'] if input_type == 'image' else None
       video = row['input'] if input_type == 'video' else None
       audio = row['input'] if input_type == 'audio' else None
-      print(image)
 
       if df_type == 'raw':
         input_protos.append(
