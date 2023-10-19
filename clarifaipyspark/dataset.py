@@ -1,7 +1,8 @@
 import json
 import uuid
 from typing import List
-
+import os
+import time
 import requests
 from clarifai.client.app import App
 from clarifai.client.dataset import Dataset
@@ -333,18 +334,38 @@ class Dataset(Dataset):
       temp['id'] = an.id
       temp['user_id'] = an.user_id
       temp['input_id'] = an.input_id
-      temp['created_at'] = spark.to_datetime(float(an.created_at.seconds), unit='s')
-      temp['modified_at'] = spark.to_datetime(float(an.modified_at.seconds), unit='s')
+      created_at = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
+      temp['created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
+      modified_at = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
+      temp['modified_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(modified_at))
       annotation_list.append(temp)
     df = spark.createDataFrame(annotation_list)
     return df
 
-  def export_images_to_volume(self, path, input_response):
+
+  def export_images_to_volume(path, input_response):
     for resp in input_response:
-      imgid = resp.id
-      ext = resp.data.image.image_info.format
-      url = resp.data.image.url
-      img_name = path + '/' + imgid + '.' + ext.lower()
-      response = requests.get(url)
-      with open(img_name, "wb") as f:
-        f.write(response.content)
+        imgid = resp.id
+        ext = resp.data.image.image_info.format
+        url = resp.data.image.url
+        img_name = path+'/'+imgid+'.'+ext.lower()
+        headers = {
+            "Authorization": f"Bearer {os.environ['CLARIFAI_PAT']}"
+        }
+        response = requests.get(url, headers=headers)
+        with open(img_name, "wb") as f:
+            f.write(response.content)
+
+
+  def export_text_to_volume(path, input_response):
+    for resp in input_response:
+        textid = resp.id
+        url = resp.data.text.url
+        file_name = path+'/'+textid+'.txt'
+        enc = resp.data.text.text_info.encoding
+        headers = {
+            "Authorization": f"Bearer {os.environ['CLARIFAI_PAT']}"
+        }
+        response = requests.get(url, headers=headers)
+        with open(file_name, "a", encoding=enc) as f:
+            f.write(response.content.decode())
