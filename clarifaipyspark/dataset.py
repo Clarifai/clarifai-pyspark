@@ -8,6 +8,7 @@ from clarifai.client.dataset import Dataset
 from clarifai.client.input import Inputs
 from clarifai.client.user import User
 from clarifai.errors import UserError
+from clarifai_grpc.grpc.api.resources_pb2 import Text
 from google.protobuf.json_format import MessageToJson
 from google.protobuf.struct_pb2 import Struct
 from pyspark.sql import DataFrame as SparkDataFrame
@@ -96,7 +97,7 @@ class Dataset(Dataset):
                                 input_type: str,
                                 df_type: str,
                                 dataset_id: str = None,
-                                labels: str = True) -> List['Text']:
+                                labels: str = True) -> List[Text]:
     input_protos = []
     input_obj = Inputs(user_id=self.input_id, app_id=self.app_id)
 
