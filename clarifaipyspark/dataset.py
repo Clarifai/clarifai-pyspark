@@ -100,11 +100,11 @@ class Dataset(Dataset):
                                 dataset_id: str = None,
                                 labels: str = True) -> List[Text]:
     input_protos = []
-    input_obj = Inputs(user_id=self.input_id, app_id=self.app_id)
+    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
 
     for row in dataframe.collect():
       if labels:
-        labels_list = row["concepts"]
+        labels_list = row["concepts"].split(',')
         labels = labels_list if len(row['concepts']) > 0 else None
       else:
         labels = None
@@ -173,7 +173,7 @@ class Dataset(Dataset):
 
     return input_protos
 
-  def upload_from_dataframe(self,
+  def upload_dataset_from_dataframe(self,
                             dataframe,
                             input_type: str,
                             df_type: str = None,
@@ -193,7 +193,7 @@ class Dataset(Dataset):
       raise UserError('dataframe should be a Spark DataFrame')
 
     chunk_size = min(128, chunk_size)
-    input_obj = input_obj = Inputs(user_id=self.input_id, app_id=self.app_id)
+    input_obj = input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     input_protos = self.get_inputs_from_dataframe(
         dataframe=dataframe,
         df_type=df_type,
@@ -343,7 +343,7 @@ class Dataset(Dataset):
     return df
 
 
-  def export_images_to_volume(path, input_response):
+  def export_images_to_volume(self, path, input_response):
     for resp in input_response:
         imgid = resp.id
         ext = resp.data.image.image_info.format
@@ -357,7 +357,7 @@ class Dataset(Dataset):
             f.write(response.content)
 
 
-  def export_text_to_volume(path, input_response):
+  def export_text_to_volume(self, path, input_response):
     for resp in input_response:
         textid = resp.id
         url = resp.data.text.url
