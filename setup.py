@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("requirements.txt", "r") as fh:
   install_requires = fh.read().split('\n')

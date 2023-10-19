@@ -1,16 +1,17 @@
 import json
 import uuid
 from typing import List
+
+import requests
 from clarifai.client.app import App
 from clarifai.client.dataset import Dataset
 from clarifai.client.input import Inputs
 from clarifai.client.user import User
+from clarifai.errors import UserError
 from google.protobuf.json_format import MessageToJson
 from google.protobuf.struct_pb2 import Struct
-from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame as SparkDataFrame
-import requests
-
+from pyspark.sql import SparkSession
 
 
 class Dataset(Dataset):
@@ -34,7 +35,6 @@ class Dataset(Dataset):
     self.app_id = app_id
     self.dataset_id = dataset_id
     super().__init__(user_id=user_id, app_id=app_id, dataset_id=dataset_id)
-
 
   def upload_dataset_from_csv(self,
                               csv_path: str = "",
@@ -68,12 +68,11 @@ class Dataset(Dataset):
         labels=labels,
         chunk_size=chunk_size)
 
-
   def upload_dataset_from_folder(self,
-                         folder_path: str,
-                         input_type: str,
-                         labels: bool = False,
-                         chunk_size: int = 128) -> None:
+                                 folder_path: str,
+                                 input_type: str,
+                                 labels: bool = False,
+                                 chunk_size: int = 128) -> None:
     """Uploads dataset from folder into clarifai app.
 
     Args:
@@ -93,101 +92,109 @@ class Dataset(Dataset):
         folder_path=folder_path, input_type=input_type, labels=labels, chunk_size=chunk_size)
 
   def get_inputs_from_dataframe(self,
-                              dataframe,
-                              input_type: str ,
-                              df_type: str ,
-                              dataset_id: str = None,
-                              labels: str = True) -> List['Text']:
+                                dataframe,
+                                input_type: str,
+                                df_type: str,
+                                dataset_id: str = None,
+                                labels: str = True) -> List['Text']:
     input_protos = []
-    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
+    input_obj = Inputs(user_id=self.input_id, app_id=self.app_id)
 
-    for row in dataframe.rdd.collect():
-        
-        if labels:
-          labels_list = row["concepts"]
-          labels =labels_list if len(row['concepts']) > 0 else None
-        else:
-          labels = None
+    for row in dataframe.collect():
 
-        if 'metadata' in dataframe.columns:
-          if len(row['metadata']) > 0:
-            metadata_str = row['metadata']
-            try:
-              metadata_dict = json.loads(metadata_str)
-            except json.decoder.JSONDecodeError:
-              raise UserError("metadata column in CSV file should be a valid json")
-            metadata = Struct()
-            metadata.update(metadata_dict)
-          else:
-            metadata = None
+      if labels:
+        labels_list = row["concepts"]
+        labels = labels_list if len(row['concepts']) > 0 else None
+      else:
+        labels = None
+
+      if 'metadata' in dataframe.columns:
+        if row['metadata'] is not None and len(row['metadata']) > 0:
+          metadata_str = row['metadata'].replace("'", '"')
+          print((metadata_str))
+          try:
+            metadata_dict = json.loads(metadata_str)
+          except json.decoder.JSONDecodeError:
+            raise UserError("metadata column in CSV file should be a valid json")
+          metadata = Struct()
+          metadata.update(metadata_dict)
         else:
           metadata = None
-        
-        if 'geopoints' in dataframe.columns:
-          if len(row['geopoints']) > 0:
-            geo_points = row['geopoints'].split(',')
-            geo_points = [float(geo_point) for geo_point in geo_points]
-            geo_info = geo_points if len(geo_points) == 2 else UserError(
-                "geopoints column in CSV file should have longitude,latitude")
-          else:
-            geo_info = None
+      else:
+        metadata = None
+
+      if 'geopoints' in dataframe.columns:
+        if row['geopoints'] is not None and len(row['geopoints']) > 0:
+          geo_points = row['geopoints'].split(',')
+          geo_points = [float(geo_point) for geo_point in geo_points]
+          geo_info = geo_points if len(geo_points) == 2 else UserError(
+              "geopoints column in CSV file should have longitude,latitude")
         else:
           geo_info = None
+      else:
+        geo_info = None
 
-        input_id = uuid.uuid4().hex
-        text = row["input"] if input_type == 'text' else None
-        image = row['input'] if input_type == 'image' else None
-        video = row['input'] if input_type == 'video' else None
-        audio = row['input'] if input_type == 'audio' else None
+      input_id = uuid.uuid4().hex
+      text = row["input"] if input_type == 'text' else None
+      image = row['input'] if input_type == 'image' else None
+      video = row['input'] if input_type == 'video' else None
+      audio = row['input'] if input_type == 'audio' else None
+      print(image)
 
-        if df_type == 'raw':
-          input_protos.append(input_obj.get_text_input(
-                  input_id=input_id, raw_text=text, dataset_id=dataset_id, labels=labels,geo_info=geo_info))
-        elif df_type == 'url':
-          input_protos.append(input_obj.get_input_from_url(
-                  input_id=input_id,
-                  image_url=image,
-                  text_url=text,
-                  audio_url=audio,
-                  video_url=video,
-                  dataset_id=dataset_id,
-                  labels=labels,
-                  geo_info=geo_info))
-        else:
-          input_protos.append(
+      if df_type == 'raw':
+        input_protos.append(
+            input_obj.get_text_input(
+                input_id=input_id,
+                raw_text=text,
+                dataset_id=dataset_id,
+                labels=labels,
+                geo_info=geo_info))
+      elif df_type == 'url':
+        input_protos.append(
+            input_obj.get_input_from_url(
+                input_id=input_id,
+                image_url=image,
+                text_url=text,
+                audio_url=audio,
+                video_url=video,
+                dataset_id=dataset_id,
+                labels=labels,
+                geo_info=geo_info))
+      else:
+        input_protos.append(
             input_obj.get_input_from_file(
-                  input_id=input_id,
-                  image_file=image,
-                  text_file=text,
-                  audio_file=audio,
-                  video_file=video,
-                  dataset_id=dataset_id,
-                  labels=labels,
-                  geo_info=geo_info))
+                input_id=input_id,
+                image_file=image,
+                text_file=text,
+                audio_file=audio,
+                video_file=video,
+                dataset_id=dataset_id,
+                labels=labels,
+                geo_info=geo_info))
 
     return input_protos
 
   def upload_from_dataframe(self,
-                          dataframe,
-                          input_type: str,
-                          df_type: str = None,
-                          labels: bool = True,
-                          chunk_size: int = 128) -> None:
+                            dataframe,
+                            input_type: str,
+                            df_type: str = None,
+                            labels: bool = True,
+                            chunk_size: int = 128) -> None:
 
     if input_type not in ['image', 'text', 'video', 'audio']:
       raise UserError('Invalid input type, it should be image,text,audio or video')
-    
+
     if df_type not in ['raw', 'url', 'file_path']:
       raise UserError('Invalid csv type, it should be raw, url or file_path')
 
     if df_type == 'raw' and input_type != 'text':
       raise UserError('Only text input type is supported for raw csv type')
-    
+
     if not isinstance(dataframe, SparkDataFrame):
-        raise UserError('dataframe should be a Spark DataFrame')
-    
+      raise UserError('dataframe should be a Spark DataFrame')
+
     chunk_size = min(128, chunk_size)
-    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
+    input_obj = input_obj = Inputs(user_id=self.input_id, app_id=self.app_id)
     input_protos = self.get_inputs_from_dataframe(
         dataframe=dataframe,
         df_type=df_type,
@@ -195,8 +202,6 @@ class Dataset(Dataset):
         dataset_id=self.dataset_id,
         labels=labels)
     return (input_obj._bulk_upload(inputs=input_protos, chunk_size=chunk_size))
-
-
 
   def upload_dataset_from_dataloader(self,
                                      task: str,
@@ -217,7 +222,6 @@ class Dataset(Dataset):
     """
     self.upload_dataset(task, split, module_dir, dataset_loader, chunk_size)
 
-
   def upload_dataset_from_table(self,
                                 table_path: str,
                                 task: str,
@@ -226,7 +230,7 @@ class Dataset(Dataset):
                                 table_type: str,
                                 labels: bool,
                                 module_dir: str = None,
-                                dataset_loader = None,
+                                dataset_loader=None,
                                 chunk_size: int = 128) -> None:
     """upload dataset into clarifai app from spark tables.
 
@@ -267,10 +271,7 @@ class Dataset(Dataset):
           labels=labels,
           chunk_size=chunk_size)
 
-
-  def list_inputs_from_dataset(self,
-                               per_page: int = None,
-                               input_type: str = None):
+  def list_inputs_from_dataset(self, per_page: int = None, input_type: str = None):
     """Lists all the inputs from the app.
 
     Args:
@@ -287,8 +288,8 @@ class Dataset(Dataset):
         """
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     return list(
-        input_obj.list_inputs(dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
-
+        input_obj.list_inputs(
+            dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
 
   def list_annotations(self, per_page: int = None, input_type: str = None):
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
@@ -308,9 +309,9 @@ class Dataset(Dataset):
     ### input_ids: list of input_ids for which user wants annotations
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     all_inputs = list(
-        input_obj.list_inputs(dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
+        input_obj.list_inputs(
+            dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
     return list(input_obj.list_annotations(batch_input=all_inputs))
-
 
   def export_annotations_to_dataframe(self):
     """Export all the annotations from clarifai App into spark dataframe.
@@ -329,8 +330,8 @@ class Dataset(Dataset):
     for an in response:
       temp = {}
       temp['annotation'] = json.loads(MessageToJson(an.data))
-      if not temp['annotation'] or temp['annotation']=='{}' or temp['annotation']=={}:
-          continue
+      if not temp['annotation'] or temp['annotation'] == '{}' or temp['annotation'] == {}:
+        continue
       temp['id'] = an.id
       temp['user_id'] = an.user_id
       temp['input_id'] = an.input_id
@@ -339,14 +340,13 @@ class Dataset(Dataset):
       annotation_list.append(temp)
     df = spark.createDataFrame(annotation_list)
     return df
-  
 
-  def export_images_to_volume(path, input_response):
+  def export_images_to_volume(self, path, input_response):
     for resp in input_response:
-        imgid = resp.id
-        ext = resp.data.image.image_info.format
-        url = resp.data.image.url
-        img_name = path+'/'+imgid+'.'+ext.lower()
-        response = requests.get(url)
-        with open(img_name, "wb") as f:
-            f.write(response.content)
+      imgid = resp.id
+      ext = resp.data.image.image_info.format
+      url = resp.data.image.url
+      img_name = path + '/' + imgid + '.' + ext.lower()
+      response = requests.get(url)
+      with open(img_name, "wb") as f:
+        f.write(response.content)
