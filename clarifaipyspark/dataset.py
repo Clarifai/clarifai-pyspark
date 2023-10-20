@@ -134,7 +134,7 @@ class Dataset(Dataset):
       else:
         geo_info = None
 
-      input_id = uuid.uuid4().hex
+      input_id = row['inputid'] if 'inputid' in dataframe.columns else uuid.uuid4().hex
       text = row["input"] if input_type == 'text' else None
       image = row['input'] if input_type == 'image' else None
       video = row['input'] if input_type == 'video' else None
