@@ -9,7 +9,7 @@ from clarifai.client.dataset import Dataset
 from clarifai.client.input import Inputs
 from clarifai.client.user import User
 from clarifai.errors import UserError
-from clarifai_grpc.grpc.api.resources_pb2 import Text
+from clarifai_grpc.grpc.api.resources_pb2 import Input
 from google.protobuf.json_format import MessageToJson
 from google.protobuf.struct_pb2 import Struct
 from pyspark.sql import DataFrame as SparkDataFrame
@@ -44,7 +44,7 @@ class Dataset(Dataset):
                               csv_type: str = None,
                               labels: bool = True,
                               chunk_size: int = 128) -> None:
-    """Uploads dataset into clarifai app from the csv file path.
+    """Uploads dataset to clarifai app from the csv file path.
 
     Args:
         csv_path (str): CSV file path of the dataset to be uploaded into clarifai App.
@@ -98,7 +98,7 @@ class Dataset(Dataset):
                                 input_type: str,
                                 df_type: str,
                                 dataset_id: str = None,
-                                labels: str = True) -> List[Text]:
+                                labels: str = True) -> List[Input]:
     input_protos = []
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
 
@@ -180,10 +180,23 @@ class Dataset(Dataset):
                             labels: bool = True,
                             chunk_size: int = 128) -> None:
 
-    if input_type not in ['image', 'text', 'video', 'audio']:
+    """Uploads dataset from a dataframe. 
+       Expected columns in the dataframe are inputid, input, concepts (optional), metadata (optional), geopoints (optional).
+
+      Args:
+          task (str): task type(text_clf, visual-classification, visual_detection, visual_segmentation, visual-captioning).
+          split (str): split type(train, test, val).
+          module_dir (str): path to the module directory.
+          dataset_loader (str): name of the dataset loader.
+          chunk_size (int): chunk size for concurrent upload of inputs and annotations.
+
+      Example: TODO
+    """
+
+    if input_type not in ('image', 'text', 'video', 'audio'):
       raise UserError('Invalid input type, it should be image,text,audio or video')
 
-    if df_type not in ['raw', 'url', 'file_path']:
+    if df_type not in ('raw', 'url', 'file_path'):
       raise UserError('Invalid csv type, it should be raw, url or file_path')
 
     if df_type == 'raw' and input_type != 'text':
@@ -223,15 +236,11 @@ class Dataset(Dataset):
 
   def upload_dataset_from_table(self,
                                 table_path: str,
-                                task: str,
-                                split: str,
                                 input_type: str,
                                 table_type: str,
                                 labels: bool,
-                                module_dir: str = None,
-                                dataset_loader=None,
                                 chunk_size: int = 128) -> None:
-    """upload dataset into clarifai app from spark tables.
+    """upload dataset to clarifai app from spark tables.
 
     Args:
         table_path (str): path of the table to be uploaded.
@@ -248,33 +257,18 @@ class Dataset(Dataset):
         TODO: dataframe dataloader template
         TODO: Can input column names & extreact them to convert to our csv format
     """
-
-    if dataset_loader:
-      self.upload_dataset(task, split, module_dir, dataset_loader, chunk_size)
-
-    else:
-      # df = sqlContext.table(table_path)
-      csv_path = "./"
-      # df.write.option("header", True).option("delimiter",",").csv(csv_path)
-      spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
-      df_delta = spark.read.format("delta").load(table_path)
-      df_delta.createTempView("temporary_view")
-      # convert the temporary view into a CSV file
-      csv_path = table_path.replace(".delta", ".csv")
-      spark.sql("SELECT * FROM temporary_view").write.option("header",
-                                                             "true").format("csv").save(csv_path)
-      self.upload_from_csv(
-          csv_path=csv_path,
-          input_type=input_type,
-          csv_type=table_type,
-          labels=labels,
-          chunk_size=chunk_size)
+    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
+    tempdf = spark.read.format("delta").load(table_path)
+    self.upload_from_dataframe(dataframe=tempdf, 
+                                input_type=input_type, 
+                                df_type=table_type, 
+                                labels=labels,
+                                chunk_size=chunk_size)
 
   def list_inputs_from_dataset(self, per_page: int = None, input_type: str = None):
     """Lists all the inputs from the app.
 
     Args:
-        dataset_id (str): dataset_id of which the inputs needs to be listed.
         per_page (str): No of response of inputs per page.
         input_type (str): Input type that needs to be displayed (text,image)
         TODO: Do we need input_type ?, since in our case it is image, so probably we can go with default value of "image".
@@ -286,7 +280,7 @@ class Dataset(Dataset):
         list of inputs.
         """
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    return list(
+    yield list(
         input_obj.list_inputs(
             dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
 
@@ -294,7 +288,6 @@ class Dataset(Dataset):
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
 
     Args:
-        dataset_id (str): dataset_id of which the inputs needs to be listed.
         per_page (str): No of response of inputs per page.
         input_type (str): Input type that needs to be displayed (text,image)
         TODO: Do we need input_type ?, since in our case it is image, so probably we can go with default value of "image".
@@ -310,10 +303,10 @@ class Dataset(Dataset):
     all_inputs = list(
         input_obj.list_inputs(
             dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
-    return list(input_obj.list_annotations(batch_input=all_inputs))
+    yield list(input_obj.list_annotations(batch_input=all_inputs))
 
   def export_annotations_to_dataframe(self):
-    """Export all the annotations from clarifai App into spark dataframe.
+    """Export all the annotations from clarifai App to spark dataframe.
 
     Examples:
         TODO
@@ -334,13 +327,16 @@ class Dataset(Dataset):
       temp['id'] = an.id
       temp['user_id'] = an.user_id
       temp['input_id'] = an.input_id
-      created_at = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
-      temp['created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
-      modified_at = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
-      temp['modified_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(modified_at))
+      try:
+        created_at = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
+        temp['created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
+        modified_at = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
+        temp['modified_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(modified_at))
+      except:
+        temp['created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
+        temp['modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
       annotation_list.append(temp)
-    df = spark.createDataFrame(annotation_list)
-    return df
+    yield spark.createDataFrame(annotation_list)
 
 
   def export_images_to_volume(self, path, input_response):
@@ -350,7 +346,7 @@ class Dataset(Dataset):
         url = resp.data.image.url
         img_name = path+'/'+imgid+'.'+ext.lower()
         headers = {
-            "Authorization": f"Bearer {os.environ['CLARIFAI_PAT']}"
+            "Authorization": self.metadata[0][1]
         }
         response = requests.get(url, headers=headers)
         with open(img_name, "wb") as f:
@@ -364,7 +360,7 @@ class Dataset(Dataset):
         file_name = path+'/'+textid+'.txt'
         enc = resp.data.text.text_info.encoding
         headers = {
-            "Authorization": f"Bearer {os.environ['CLARIFAI_PAT']}"
+            "Authorization": self.metadata[0][1]
         }
         response = requests.get(url, headers=headers)
         with open(file_name, "a", encoding=enc) as f:

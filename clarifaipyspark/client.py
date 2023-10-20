@@ -14,7 +14,7 @@ class ClarifaiPySpark(BaseClient):
     Args:
       - user_id (str): A user ID for authentication.
       - app_id (str): An app ID for the application to interact with.
-  """
+    """
 
     self.user = User(user_id=user_id)
     self.app = App(app_id=app_id)
@@ -26,11 +26,11 @@ class ClarifaiPySpark(BaseClient):
     """Initializes the dataset method with dataset_id.
 
     Args:
-        dataset_id: The dataset_id within the user app.
+      dataset_id: The dataset_id within the user app.
 
     Returns:
-           Dataset object for the dataset_id.
-      """
+      Dataset object for the dataset_id.
+    """
 
     self.dataset_id = dataset_id
     try:
