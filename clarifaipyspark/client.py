@@ -6,7 +6,9 @@ from clarifaipyspark.dataset import Dataset
 
 
 class ClarifaiPySpark(BaseClient):
-  """ClarifaiPySpark inherits the BaseClient class from the clarifai SDK and it initializes the client."""
+  """
+  ClarifaiPySpark inherits the BaseClient class from the clarifai SDK and it initializes the client.
+  """
 
   def __init__(self, user_id: str = "", app_id: str = ""):
     """Initializes clarifai client object.
@@ -32,7 +34,6 @@ class ClarifaiPySpark(BaseClient):
       Dataset object for the dataset_id.
     """
 
-    self.dataset_id = dataset_id
     try:
       self.app.dataset(dataset_id=dataset_id)
     except:

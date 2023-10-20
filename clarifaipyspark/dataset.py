@@ -1,8 +1,8 @@
 import json
+import time
 import uuid
 from typing import List
-import os
-import time
+
 import requests
 from clarifai.client.app import App
 from clarifai.client.dataset import Dataset
@@ -17,7 +17,10 @@ from pyspark.sql import SparkSession
 
 
 class Dataset(Dataset):
-  """Dataset class provides information about dataset of the app and it inherits from the clarifai SDK Dataset class."""
+  """
+  Dataset class provides information about dataset of the app
+  and it inherits from the clarifai SDK Dataset class.
+  """
 
   def __init__(self, user_id: str = "", app_id: str = "", dataset_id: str = ""):
     """Initializes the Dataset object.
@@ -174,13 +177,12 @@ class Dataset(Dataset):
     return input_protos
 
   def upload_dataset_from_dataframe(self,
-                            dataframe,
-                            input_type: str,
-                            df_type: str = None,
-                            labels: bool = True,
-                            chunk_size: int = 128) -> None:
-
-    """Uploads dataset from a dataframe. 
+                                    dataframe,
+                                    input_type: str,
+                                    df_type: str = None,
+                                    labels: bool = True,
+                                    chunk_size: int = 128) -> None:
+    """Uploads dataset from a dataframe.
        Expected columns in the dataframe are inputid, input, concepts (optional), metadata (optional), geopoints (optional).
 
       Args:
@@ -219,7 +221,6 @@ class Dataset(Dataset):
                                      task: str,
                                      split: str,
                                      module_dir: str = None,
-                                     dataset_loader: str = None,
                                      chunk_size: int = 128) -> None:
     """Uploads dataset using a dataloader function for custom formats.
 
@@ -227,12 +228,11 @@ class Dataset(Dataset):
         task (str): task type(text_clf, visual-classification, visual_detection, visual_segmentation, visual-captioning).
         split (str): split type(train, test, val).
         module_dir (str): path to the module directory.
-        dataset_loader (str): name of the dataset loader.
         chunk_size (int): chunk size for concurrent upload of inputs and annotations.
 
     Example: TODO
     """
-    self.upload_dataset(task, split, module_dir, dataset_loader, chunk_size)
+    self.upload_dataset(task, split, module_dir, chunk_size)
 
   def upload_dataset_from_table(self,
                                 table_path: str,
@@ -259,13 +259,14 @@ class Dataset(Dataset):
     """
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
     tempdf = spark.read.format("delta").load(table_path)
-    self.upload_from_dataframe(dataframe=tempdf, 
-                                input_type=input_type, 
-                                df_type=table_type, 
-                                labels=labels,
-                                chunk_size=chunk_size)
+    self.upload_from_dataframe(
+        dataframe=tempdf,
+        input_type=input_type,
+        df_type=table_type,
+        labels=labels,
+        chunk_size=chunk_size)
 
-  def list_inputs_from_dataset(self, per_page: int = None, input_type: str = None):
+  def list_inputs(self, per_page: int = None, input_type: str = None):
     """Lists all the inputs from the app.
 
     Args:
@@ -280,9 +281,8 @@ class Dataset(Dataset):
         list of inputs.
         """
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    yield list(
-        input_obj.list_inputs(
-            dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
+    yield input_obj.list_inputs(
+        dataset_id=self.dataset_id, input_type=input_type, per_page=per_page)
 
   def list_annotations(self, per_page: int = None, input_type: str = None):
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
@@ -303,7 +303,7 @@ class Dataset(Dataset):
     all_inputs = list(
         input_obj.list_inputs(
             dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
-    yield list(input_obj.list_annotations(batch_input=all_inputs))
+    yield input_obj.list_annotations(batch_input=all_inputs)
 
   def export_annotations_to_dataframe(self):
     """Export all the annotations from clarifai App to spark dataframe.
@@ -338,30 +338,24 @@ class Dataset(Dataset):
       annotation_list.append(temp)
     yield spark.createDataFrame(annotation_list)
 
-
   def export_images_to_volume(self, path, input_response):
     for resp in input_response:
-        imgid = resp.id
-        ext = resp.data.image.image_info.format
-        url = resp.data.image.url
-        img_name = path+'/'+imgid+'.'+ext.lower()
-        headers = {
-            "Authorization": self.metadata[0][1]
-        }
-        response = requests.get(url, headers=headers)
-        with open(img_name, "wb") as f:
-            f.write(response.content)
-
+      imgid = resp.id
+      ext = resp.data.image.image_info.format
+      url = resp.data.image.url
+      img_name = path + '/' + imgid + '.' + ext.lower()
+      headers = {"Authorization": self.metadata[0][1]}
+      response = requests.get(url, headers=headers)
+      with open(img_name, "wb") as f:
+        f.write(response.content)
 
   def export_text_to_volume(self, path, input_response):
     for resp in input_response:
-        textid = resp.id
-        url = resp.data.text.url
-        file_name = path+'/'+textid+'.txt'
-        enc = resp.data.text.text_info.encoding
-        headers = {
-            "Authorization": self.metadata[0][1]
-        }
-        response = requests.get(url, headers=headers)
-        with open(file_name, "a", encoding=enc) as f:
-            f.write(response.content.decode())
+      textid = resp.id
+      url = resp.data.text.url
+      file_name = path + '/' + textid + '.txt'
+      enc = resp.data.text.text_info.encoding
+      headers = {"Authorization": self.metadata[0][1]}
+      response = requests.get(url, headers=headers)
+      with open(file_name, "a", encoding=enc) as f:
+        f.write(response.content.decode())
