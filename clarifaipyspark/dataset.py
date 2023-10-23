@@ -232,7 +232,7 @@ class Dataset(Dataset):
 
     Example: TODO
     """
-    self.upload_dataset(task, split, module_dir, chunk_size)
+    self.upload_dataset(task=task, split=split, module_dir=module_dir, chunk_size=chunk_size)
 
   def upload_dataset_from_table(self,
                                 table_path: str,
@@ -281,7 +281,7 @@ class Dataset(Dataset):
         list of inputs.
         """
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    yield input_obj.list_inputs(
+    return input_obj.list_inputs(
         dataset_id=self.dataset_id, input_type=input_type, per_page=per_page)
 
   def list_annotations(self, per_page: int = None, input_type: str = None):
@@ -303,7 +303,7 @@ class Dataset(Dataset):
     all_inputs = list(
         input_obj.list_inputs(
             dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
-    yield input_obj.list_annotations(batch_input=all_inputs)
+    return input_obj.list_annotations(batch_input=all_inputs)
 
   def export_annotations_to_dataframe(self):
     """Export all the annotations from clarifai App to spark dataframe.
@@ -336,7 +336,7 @@ class Dataset(Dataset):
         temp['created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
         temp['modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
       annotation_list.append(temp)
-    yield spark.createDataFrame(annotation_list)
+    return spark.createDataFrame(annotation_list)
 
   def export_images_to_volume(self, path, input_response):
     for resp in input_response:
