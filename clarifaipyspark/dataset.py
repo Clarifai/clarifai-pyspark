@@ -83,7 +83,7 @@ class Dataset(Dataset):
     Args:
         folder_path (str): folder path of the dataset to be uploaded into clarifai App.
         input_type (str): Input type of the dataset whether (Image, text).
-        labels (bool): Give True if labels column present in dataset else False.
+        labels (bool): Give True if folder name is a label name else False.
         chunk_size (int): chunk size of parallel uploads of inputs and annotations.
 
     Example: TODO
@@ -96,7 +96,7 @@ class Dataset(Dataset):
     self.upload_from_folder(
         folder_path=folder_path, input_type=input_type, labels=labels, chunk_size=chunk_size)
 
-  def get_inputs_from_dataframe(self,
+  def _get_inputs_from_dataframe(self,
                                 dataframe,
                                 input_type: str,
                                 df_type: str,
@@ -209,7 +209,7 @@ class Dataset(Dataset):
 
     chunk_size = min(128, chunk_size)
     input_obj = input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    input_protos = self.get_inputs_from_dataframe(
+    input_protos = self._get_inputs_from_dataframe(
         dataframe=dataframe,
         df_type=df_type,
         input_type=input_type,
