@@ -284,7 +284,7 @@ class Dataset(Dataset):
     return input_obj.list_inputs(
         dataset_id=self.dataset_id, input_type=input_type, per_page=per_page)
 
-  def list_annotations(self, per_page: int = None, input_type: str = None):
+  def list_annotations(self, input_ids: list = None, per_page: int = None, input_type: str = None):
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
 
     Args:
@@ -300,12 +300,15 @@ class Dataset(Dataset):
     """
     ### input_ids: list of input_ids for which user wants annotations
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    all_inputs = list(
-        input_obj.list_inputs(
-            dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
+    if not input_ids:
+        all_inputs = list(
+            input_obj.list_inputs(
+                dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
+    else:
+        all_inputs = [input_obj._get_proto(input_id=inpid, dataset_id=self.dataset_id) for inpid in input_ids]
     return input_obj.list_annotations(batch_input=all_inputs)
 
-  def export_annotations_to_dataframe(self):
+  def export_annotations_to_dataframe(self, input_ids: list = None):
     """Export all the annotations from clarifai App to spark dataframe.
 
     Examples:
@@ -316,14 +319,11 @@ class Dataset(Dataset):
 
     annotation_list = []
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
-    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    all_inputs = list(input_obj.list_inputs(dataset_id=self.dataset_id))
-    response = list(input_obj.list_annotations(batch_input=all_inputs))
+    response = list(self.list_annotations(input_ids=input_ids))
     for an in response:
       temp = {}
-      temp['annotation'] = json.loads(MessageToJson(an.data))
-      if not temp['annotation'] or temp['annotation'] == '{}' or temp['annotation'] == {}:
-        continue
+      temp['annotation'] = json.loads(MessageToJson(an.data)) if an.data else None
+      temp['annotation'] = temp['annotation'] if temp['annotation'] and temp['annotation'].__len__() else None
       temp['id'] = an.id
       temp['user_id'] = an.user_id
       temp['input_id'] = an.input_id
