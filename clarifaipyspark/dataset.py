@@ -288,6 +288,7 @@ class Dataset(Dataset):
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
 
     Args:
+        input_ids (list): list of input_ids for which user wants annotations
         per_page (str): No of response of inputs per page.
         input_type (str): Input type that needs to be displayed (text,image)
         TODO: Do we need input_type ?, since in our case it is image, so probably we can go with default value of "image".
@@ -309,7 +310,10 @@ class Dataset(Dataset):
     return input_obj.list_annotations(batch_input=all_inputs)
 
   def export_annotations_to_dataframe(self, input_ids: list = None):
-    """Export all the annotations from clarifai App to spark dataframe.
+    """Export all the annotations from clarifai App's dataset to spark dataframe.
+
+    Args:
+        input_ids (list): list of input_ids for which user wants annotations
 
     Examples:
         TODO
@@ -322,8 +326,9 @@ class Dataset(Dataset):
     response = list(self.list_annotations(input_ids=input_ids))
     for an in response:
       temp = {}
-      temp['annotation'] = json.loads(MessageToJson(an.data)) if an.data else None
-      temp['annotation'] = temp['annotation'] if temp['annotation'] and temp['annotation'].__len__() else None
+      temp['annotation'] = json.loads(MessageToJson(an.data))
+      if not temp['annotation'] or temp['annotation'] == '{}' or temp['annotation'] == {}:
+        continue
       temp['id'] = an.id
       temp['user_id'] = an.user_id
       temp['input_id'] = an.input_id
