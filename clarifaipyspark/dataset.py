@@ -150,6 +150,7 @@ class Dataset(Dataset):
                 raw_text=text,
                 dataset_id=dataset_id,
                 labels=labels,
+                metadata=metadata,
                 geo_info=geo_info))
       elif df_type == 'url':
         input_protos.append(
@@ -161,6 +162,7 @@ class Dataset(Dataset):
                 video_url=video,
                 dataset_id=dataset_id,
                 labels=labels,
+                metadata=metadata,
                 geo_info=geo_info))
       else:
         input_protos.append(
@@ -172,6 +174,7 @@ class Dataset(Dataset):
                 video_file=video,
                 dataset_id=dataset_id,
                 labels=labels,
+                metadata=metadata,
                 geo_info=geo_info))
 
     return input_protos
