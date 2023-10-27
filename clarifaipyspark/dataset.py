@@ -43,6 +43,7 @@ class Dataset(Dataset):
 
   def upload_dataset_from_csv(self,
                               csv_path: str = "",
+                              source: str = "volume",
                               input_type: str = 'text',
                               csv_type: str = None,
                               labels: bool = True,
@@ -51,6 +52,7 @@ class Dataset(Dataset):
 
     Args:
         csv_path (str): CSV file path of the dataset to be uploaded into clarifai App.
+        source (str): Source for csv file whether (volume, s3)
         input_type (str): Input type of the dataset whether (Image, text).
         csv_type (str): Type of the csv file contents(url, raw, filepath).
         labels (bool): Give True if labels column present in dataset else False.
@@ -65,13 +67,25 @@ class Dataset(Dataset):
         geopoints should be in "long,lat" format.
 
     """
-    ### TODO: Can input column names & extract them to convert to our csv format
-    self.upload_from_csv(
-        csv_path=csv_path,
-        input_type=input_type,
-        csv_type=csv_type,
-        labels=labels,
-        chunk_size=chunk_size)
+    if source == "volume":
+        self.upload_from_csv(
+            csv_path=csv_path,
+            input_type=input_type,
+            csv_type=csv_type,
+            labels=labels,
+            chunk_size=chunk_size)
+    elif source == "s3":
+        spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
+        df_csv = spark.read.format("csv").option('header', 'true').load(csv_path)
+        self.upload_dataset_from_dataframe(dataframe=df_csv, 
+                                           input_type=input_type,
+                                           df_type=csv_type,
+                                           labels=labels,
+                                           chunk_size=chunk_size)
+    else:
+        raise UserError("Source should be one of 'volume' or 's3'")
+
+
 
   def upload_dataset_from_folder(self,
                                  folder_path: str,
@@ -259,7 +273,7 @@ class Dataset(Dataset):
     """
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
     tempdf = spark.read.format("delta").load(table_path)
-    self.upload_from_dataframe(
+    self.upload_dataset_from_dataframe(
         dataframe=tempdf,
         input_type=input_type,
         df_type=table_type,
