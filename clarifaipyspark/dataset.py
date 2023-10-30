@@ -343,24 +343,35 @@ class Dataset(Dataset):
     response = list(self.list_annotations(input_ids=input_ids))
     for an in response:
       temp = {}
-      temp['annotation'] = json.loads(MessageToJson(an.data))
-      if not temp['annotation'] or temp['annotation'] == '{}' or temp['annotation'] == {}:
+      temp['annotation'] = str(an.data)
+      if not temp['annotation'] or temp['annotation'] == '{}':
         continue
-      temp['id'] = an.id
-      temp['user_id'] = an.user_id
+      temp['annotation_id'] = an.id
+      temp['annotation_user_id'] = an.user_id
       temp['input_id'] = an.input_id
       try:
         created_at = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
-        temp['created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
+        temp['annotation_created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
         modified_at = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
-        temp['modified_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(modified_at))
+        temp['annotation_modified_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(modified_at))
       except:
-        temp['created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
-        temp['modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
+        temp['annotation_created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
+        temp['annotation_modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
       annotation_list.append(temp)
     return spark.createDataFrame(annotation_list)
 
   def export_images_to_volume(self, path, input_response):
+    """Download all the images from clarifai App's dataset to spark volume storage.
+
+    Args:
+        path (str): path of the volume storage where images will be downloaded.
+        input_response (list): response of list_inputs() method.
+
+    Examples:
+        TODO
+
+    Returns:
+        None. Images are saved into the volume storage."""
     for resp in input_response:
       imgid = resp.id
       ext = resp.data.image.image_info.format
@@ -372,6 +383,17 @@ class Dataset(Dataset):
         f.write(response.content)
 
   def export_text_to_volume(self, path, input_response):
+    """Download all the text files from clarifai App's dataset to spark volume storage.
+
+    Args:
+        path (str): path of the volume storage where images will be downloaded.
+        input_response (list): response of list_inputs() method.
+
+    Examples:
+        TODO
+
+    Returns:
+        None. text files are saved into the volume storage."""
     for resp in input_response:
       textid = resp.id
       url = resp.data.text.url
@@ -381,3 +403,55 @@ class Dataset(Dataset):
       response = requests.get(url, headers=headers)
       with open(file_name, "a", encoding=enc) as f:
         f.write(response.content.decode())
+
+  def export_inputs_to_dataframe(self, input_type):
+    """Export all the inputs from clarifai App's dataset to spark dataframe.
+
+    Args:
+        input_type (str): Input type that needs to be fetched (text,image)
+
+    Examples:
+        TODO
+
+    Returns:
+        spark dataframe with inputs"""
+    if input_type not in ('image', 'text'):
+      raise UserError('Invalid input type, it should be image or text')
+    input_list = []
+    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
+    response = list(self.list_inputs(input_type=input_type))
+    for inp in response:
+      temp = {}
+      temp['input_id'] = inp.id
+      if input_type == 'image':
+        temp['image_url'] = inp.data.image.url
+        temp['image_info'] = str(inp.data.image.image_info)
+      elif input_type == 'text':
+        temp['text_url'] = inp.data.text.url
+        temp['text_info'] = str(inp.data.text.text_info)
+      try:
+        created_at = float(f"{inp.created_at.seconds}.{inp.created_at.nanos}")
+        temp['input_created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
+        modified_at = float(f"{inp.modified_at.seconds}.{inp.modified_at.nanos}")
+        temp['input_modified_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(modified_at))
+      except:
+        temp['input_created_at'] = float(f"{inp.created_at.seconds}.{inp.created_at.nanos}")
+        temp['input_modified_at'] = float(f"{inp.modified_at.seconds}.{inp.modified_at.nanos}")
+      input_list.append(temp)
+    return spark.createDataFrame(input_list)
+
+  def export_dataset_to_dataframe(self, input_type, input_ids: list = None):
+    """Export all the inputs & their annotations from clarifai App's dataset to spark dataframe.
+
+    Args:
+        input_type (str): Input type that needs to be fetched (text,image)
+        input_ids (list): list of input_ids for which user wants annotations
+
+    Examples:
+        TODO
+
+    Returns:
+        spark dataframe with inputs & their annotations"""
+    inputs_df = self.export_inputs_to_dataframe(input_type=input_type)
+    annotations_df = self.export_annotations_to_dataframe(input_ids=input_ids)
+    return inputs_df.join(annotations_df, inputs_df.input_id == annotations_df.input_id, how='left').drop(annotations_df.input_id)
