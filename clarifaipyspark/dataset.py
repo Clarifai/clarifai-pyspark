@@ -326,7 +326,7 @@ class Dataset(Dataset):
         all_inputs = [input_obj._get_proto(input_id=inpid, dataset_id=self.dataset_id) for inpid in input_ids]
     return input_obj.list_annotations(batch_input=all_inputs)
 
-  def export_annotations_to_dataframe(self, input_ids: list = None):
+  def export_annotations_to_dataframe(self, input_ids: list = None, input_type: str = None):
     """Export all the annotations from clarifai App's dataset to spark dataframe.
 
     Args:
@@ -340,7 +340,7 @@ class Dataset(Dataset):
 
     annotation_list = []
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
-    response = list(self.list_annotations(input_ids=input_ids))
+    response = list(self.list_annotations(input_ids=input_ids, input_type=input_type))
     for an in response:
       temp = {}
       temp['annotation'] = str(an.data)
