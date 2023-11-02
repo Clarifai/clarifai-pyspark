@@ -1,7 +1,7 @@
 import json
 import time
 import uuid
-from typing import List
+from typing import Generator, List
 
 import requests
 from clarifai.client.app import App
@@ -9,7 +9,7 @@ from clarifai.client.dataset import Dataset
 from clarifai.client.input import Inputs
 from clarifai.client.user import User
 from clarifai.errors import UserError
-from clarifai_grpc.grpc.api.resources_pb2 import Input
+from clarifai_grpc.grpc.api.resources_pb2 import Input, Annotation
 from google.protobuf.json_format import MessageToJson
 from google.protobuf.struct_pb2 import Struct
 from pyspark.sql import DataFrame as SparkDataFrame
@@ -261,18 +261,12 @@ class Dataset(Dataset):
 
     Args:
         table_path (str): path of the table to be uploaded.
-        task (str):
-        split (str):
         input_type (str): Input type of the dataset whether (Image, text).
         table_type (str): Type of the table contents (url, raw, filepath).
         labels (bool): Give True if labels column present in dataset else False.
-        module_dir (str): path to the module directory.
-        dataset_loader (str): name of the dataset loader.
         chunk_size (int): chunk size for concurrent upload of inputs and annotations.
-    Note:
-        Accepted csv format - input, label
-        TODO: dataframe dataloader template
-        TODO: Can input column names & extreact them to convert to our csv format
+      
+    Example: TODO
     """
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
     tempdf = spark.read.format("delta").load(table_path)
@@ -283,7 +277,7 @@ class Dataset(Dataset):
         labels=labels,
         chunk_size=chunk_size)
 
-  def list_inputs(self, per_page: int = None, input_type: str = None):
+  def list_inputs(self, per_page: int = None, input_type: str = None) -> Generator[Input, None, None]:
     """Lists all the inputs from the app.
 
     Args:
@@ -301,7 +295,7 @@ class Dataset(Dataset):
     return input_obj.list_inputs(
         dataset_id=self.dataset_id, input_type=input_type, per_page=per_page)
 
-  def list_annotations(self, input_ids: list = None, per_page: int = None, input_type: str = None):
+  def list_annotations(self, input_ids: list = None, per_page: int = None, input_type: str = None) -> Generator[Annotation, None, None]:
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
 
     Args:
@@ -331,7 +325,7 @@ class Dataset(Dataset):
 
     Args:
         input_ids (list): list of input_ids for which user wants annotations
-
+        input_type (str): Input type that needs to be displayed (text,image)
     Examples:
         TODO
 
