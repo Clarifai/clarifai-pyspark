@@ -283,7 +283,6 @@ class Dataset(Dataset):
     Args:
         per_page (str): No of response of inputs per page.
         input_type (str): Input type that needs to be displayed (text,image)
-        TODO: Do we need input_type ?, since in our case it is image, so probably we can go with default value of "image".
 
     Examples:
         TODO
@@ -291,6 +290,8 @@ class Dataset(Dataset):
     Returns:
         list of inputs.
         """
+    if input_type not in ('image', 'text'):
+      raise UserError('Invalid input type, it should be image or text')
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     return input_obj.list_inputs(
         dataset_id=self.dataset_id, input_type=input_type, per_page=per_page)
