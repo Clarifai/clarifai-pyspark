@@ -9,8 +9,7 @@ from clarifai.client.dataset import Dataset
 from clarifai.client.input import Inputs
 from clarifai.client.user import User
 from clarifai.errors import UserError
-from clarifai_grpc.grpc.api.resources_pb2 import Input, Annotation
-from google.protobuf.json_format import MessageToJson
+from clarifai_grpc.grpc.api.resources_pb2 import Annotation, Input
 from google.protobuf.struct_pb2 import Struct
 from pyspark.sql import DataFrame as SparkDataFrame
 from pyspark.sql import SparkSession
@@ -68,24 +67,23 @@ class Dataset(Dataset):
 
     """
     if source == "volume":
-        self.upload_from_csv(
-            csv_path=csv_path,
-            input_type=input_type,
-            csv_type=csv_type,
-            labels=labels,
-            chunk_size=chunk_size)
+      self.upload_from_csv(
+          csv_path=csv_path,
+          input_type=input_type,
+          csv_type=csv_type,
+          labels=labels,
+          chunk_size=chunk_size)
     elif source == "s3":
-        spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
-        df_csv = spark.read.format("csv").option('header', 'true').load(csv_path)
-        self.upload_dataset_from_dataframe(dataframe=df_csv, 
-                                           input_type=input_type,
-                                           df_type=csv_type,
-                                           labels=labels,
-                                           chunk_size=chunk_size)
+      spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
+      df_csv = spark.read.format("csv").option('header', 'true').load(csv_path)
+      self.upload_dataset_from_dataframe(
+          dataframe=df_csv,
+          input_type=input_type,
+          df_type=csv_type,
+          labels=labels,
+          chunk_size=chunk_size)
     else:
-        raise UserError("Source should be one of 'volume' or 's3'")
-
-
+      raise UserError("Source should be one of 'volume' or 's3'")
 
   def upload_dataset_from_folder(self,
                                  folder_path: str,
@@ -111,11 +109,11 @@ class Dataset(Dataset):
         folder_path=folder_path, input_type=input_type, labels=labels, chunk_size=chunk_size)
 
   def _get_inputs_from_dataframe(self,
-                                dataframe,
-                                input_type: str,
-                                df_type: str,
-                                dataset_id: str = None,
-                                labels: str = True) -> List[Input]:
+                                 dataframe,
+                                 input_type: str,
+                                 df_type: str,
+                                 dataset_id: str = None,
+                                 labels: str = True) -> List[Input]:
     input_protos = []
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
 
@@ -264,7 +262,7 @@ class Dataset(Dataset):
         table_type (str): Type of the table contents (url, raw, filepath).
         labels (bool): Give True if labels column present in dataset else False.
         chunk_size (int): chunk size for concurrent upload of inputs and annotations.
-      
+
     Example: TODO
     """
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
@@ -276,7 +274,8 @@ class Dataset(Dataset):
         labels=labels,
         chunk_size=chunk_size)
 
-  def list_inputs(self, per_page: int = None, input_type: str = None) -> Generator[Input, None, None]:
+  def list_inputs(self, per_page: int = None,
+                  input_type: str = None) -> Generator[Input, None, None]:
     """Lists all the inputs from the app.
 
     Args:
@@ -288,14 +287,15 @@ class Dataset(Dataset):
 
     Returns:
         list of inputs.
-        """
+    """
     if input_type not in ('image', 'text'):
       raise UserError('Invalid input type, it should be image or text')
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     return input_obj.list_inputs(
         dataset_id=self.dataset_id, input_type=input_type, per_page=per_page)
 
-  def list_annotations(self, input_ids: list = None, per_page: int = None, input_type: str = None) -> Generator[Annotation, None, None]:
+  def list_annotations(self, input_ids: list = None, per_page: int = None,
+                       input_type: str = None) -> Generator[Annotation, None, None]:
     """Lists all the annotations for the inputs in the dataset of a clarifai app.
 
     Args:
@@ -313,11 +313,13 @@ class Dataset(Dataset):
     ### input_ids: list of input_ids for which user wants annotations
     input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     if not input_ids:
-        all_inputs = list(
-            input_obj.list_inputs(
-                dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
+      all_inputs = list(
+          input_obj.list_inputs(
+              dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
     else:
-        all_inputs = [input_obj._get_proto(input_id=inpid, dataset_id=self.dataset_id) for inpid in input_ids]
+      all_inputs = [
+          input_obj._get_proto(input_id=inpid, dataset_id=self.dataset_id) for inpid in input_ids
+      ]
     return input_obj.list_annotations(batch_input=all_inputs)
 
   def export_annotations_to_dataframe(self, input_ids: list = None, input_type: str = None):
@@ -330,7 +332,8 @@ class Dataset(Dataset):
         TODO
 
     Returns:
-        spark dataframe with annotations"""
+        spark dataframe with annotations
+    """
 
     annotation_list = []
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
@@ -347,7 +350,8 @@ class Dataset(Dataset):
         created_at = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
         temp['annotation_created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
         modified_at = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
-        temp['annotation_modified_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(modified_at))
+        temp['annotation_modified_at'] = time.strftime('%m/%d/% %H:%M:%5',
+                                                       time.gmtime(modified_at))
       except:
         temp['annotation_created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
         temp['annotation_modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
@@ -365,7 +369,8 @@ class Dataset(Dataset):
         TODO
 
     Returns:
-        None. Images are saved into the volume storage."""
+        None. Images are saved into the volume storage.
+    """
     for resp in input_response:
       imgid = resp.id
       ext = resp.data.image.image_info.format
@@ -387,7 +392,8 @@ class Dataset(Dataset):
         TODO
 
     Returns:
-        None. text files are saved into the volume storage."""
+        None. text files are saved into the volume storage.
+    """
     for resp in input_response:
       textid = resp.id
       url = resp.data.text.url
@@ -408,7 +414,8 @@ class Dataset(Dataset):
         TODO
 
     Returns:
-        spark dataframe with inputs"""
+        spark dataframe with inputs
+    """
     if input_type not in ('image', 'text'):
       raise UserError('Invalid input type, it should be image or text')
     input_list = []
@@ -445,7 +452,10 @@ class Dataset(Dataset):
         TODO
 
     Returns:
-        spark dataframe with inputs & their annotations"""
+        spark dataframe with inputs & their annotations
+    """
     inputs_df = self.export_inputs_to_dataframe(input_type=input_type)
     annotations_df = self.export_annotations_to_dataframe(input_ids=input_ids)
-    return inputs_df.join(annotations_df, inputs_df.input_id == annotations_df.input_id, how='left').drop(annotations_df.input_id)
+    return inputs_df.join(
+        annotations_df, inputs_df.input_id == annotations_df.input_id,
+        how='left').drop(annotations_df.input_id)
