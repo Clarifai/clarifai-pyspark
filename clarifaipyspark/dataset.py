@@ -203,17 +203,16 @@ class Dataset(Dataset):
        Expected columns in the dataframe are inputid, input, concepts (optional), metadata (optional), geopoints (optional).
 
       Args:
-          task (str): task type(text_clf, visual-classification, visual_detection, visual_segmentation, visual-captioning).
-          split (str): split type(train, test, val).
-          module_dir (str): path to the module directory.
-          dataset_loader (str): name of the dataset loader.
-          chunk_size (int): chunk size for concurrent upload of inputs and annotations.
+          dataframe (SparkDataFrame): Spark dataframe with image/text URLs and labels.
+          input_type (str): Input type of the dataset whether (Image, text).
+          labels (bool): Give True if folder name is a label name else False.
+          chunk_size (int): chunk size of parallel uploads of inputs and annotations.
 
       Example: TODO
     """
 
-    if input_type not in ('image', 'text', 'video', 'audio'):
-      raise UserError('Invalid input type, it should be image,text,audio or video')
+    if input_type not in ('image', 'text'):
+      raise UserError('Invalid input type, it should be image or text')
 
     if df_type not in ('raw', 'url', 'file_path'):
       raise UserError('Invalid csv type, it should be raw, url or file_path')
