@@ -1,5 +1,4 @@
 # clarifai-pyspark
-(## Under Development!)
 
 ## INTRODUCTION 
 
