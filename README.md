@@ -26,14 +26,14 @@ The initial use case for this SDK revolves around three main objectives:
 ## Setup:
 
 Install the package and initialize the clarifaipyspark class to begin.
-``` ruby
+``` python
 pip install clarifai-pyspark
 from clarifaipyspark.client import ClarifaiPySpark
 ```
 Create a Clarifai-PySpark client object to connect to your app on Clarifai. You can also choose the dataset or create one in your clarifai app to upload the data.
-``` ruby
-Claps_obj = ClarifaiPySpark(user_id=USER_ID, app_id=APP_ID)
-dataset_obj = Claps_obj.dataset(dataset_id=DATASET_ID)
+``` python
+claps_obj = ClarifaiPySpark(user_id=USER_ID, app_id=APP_ID)
+dataset_obj = claps_obj.dataset(dataset_id=DATASET_ID)
 ```
 ## Examples:
 Checkout these notebooks for various operations you can perform using clarifai-pyspark SDK.
