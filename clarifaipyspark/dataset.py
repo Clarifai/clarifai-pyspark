@@ -1,13 +1,11 @@
 import json
 import time
 import uuid
-from typing import Generator, List
+from typing import Generator, List, Type
 
 import requests
-from clarifai.client.app import App
 from clarifai.client.dataset import Dataset
-from clarifai.client.input import Inputs
-from clarifai.client.user import User
+from clarifai.datasets.upload.base import ClarifaiDataLoader
 from clarifai.errors import UserError
 from clarifai_grpc.grpc.api.resources_pb2 import Annotation, Input
 from google.protobuf.struct_pb2 import Struct
@@ -21,24 +19,21 @@ class Dataset(Dataset):
   and it inherits from the clarifai SDK Dataset class.
   """
 
-  def __init__(self, user_id: str = "", app_id: str = "", dataset_id: str = ""):
+  def __init__(self, user_id: str, app_id: str, dataset_id: str, pat=None):
     """Initializes the Dataset object.
 
     Args:
         user_id (str): The clarifai user ID of the user.
         app_id (str): Clarifai App ID.
         dataset_id (str): Dataset ID of the dataset inside the clarifai App.
+        pat (str): Personal Access Token for authentication. Can be set as env var CLARIFAI_PAT
 
     Example: TODO
     """
-    self.user = User(user_id=user_id)
-    self.app = App(app_id=app_id)
-    #Inputs object - for listannotations
-    #input_obj = User(user_id="user_id").app(app_id="app_id").inputs()
     self.user_id = user_id
     self.app_id = app_id
     self.dataset_id = dataset_id
-    super().__init__(user_id=user_id, app_id=app_id, dataset_id=dataset_id)
+    super().__init__(user_id=user_id, app_id=app_id, dataset_id=dataset_id, pat=pat)
 
   def upload_dataset_from_csv(self,
                               csv_path: str = "",
@@ -46,7 +41,7 @@ class Dataset(Dataset):
                               input_type: str = 'text',
                               csv_type: str = None,
                               labels: bool = True,
-                              chunk_size: int = 128) -> None:
+                              batch_size: int = 128) -> None:
     """Uploads dataset to clarifai app from the csv file path.
 
     Args:
@@ -55,7 +50,7 @@ class Dataset(Dataset):
         input_type (str): Input type of the dataset whether (Image, text).
         csv_type (str): Type of the csv file contents(url, raw, filepath).
         labels (bool): Give True if labels column present in dataset else False.
-        chunk_size (int): chunk size of parallel uploads of inputs and annotations.
+        batch_size (int): chunk size of parallel uploads of inputs and annotations.
 
     Example: TODO
 
@@ -72,7 +67,7 @@ class Dataset(Dataset):
           input_type=input_type,
           csv_type=csv_type,
           labels=labels,
-          chunk_size=chunk_size)
+          batch_size=batch_size)
     elif source == "s3":
       spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
       df_csv = spark.read.format("csv").option('header', 'true').load(csv_path)
@@ -81,7 +76,7 @@ class Dataset(Dataset):
           input_type=input_type,
           df_type=csv_type,
           labels=labels,
-          chunk_size=chunk_size)
+          batch_size=batch_size)
     else:
       raise UserError("Source should be one of 'volume' or 's3'")
 
@@ -89,14 +84,14 @@ class Dataset(Dataset):
                                  folder_path: str,
                                  input_type: str,
                                  labels: bool = False,
-                                 chunk_size: int = 128) -> None:
+                                 batch_size: int = 128) -> None:
     """Uploads dataset from folder into clarifai app.
 
     Args:
         folder_path (str): folder path of the dataset to be uploaded into clarifai App.
         input_type (str): Input type of the dataset whether (Image, text).
         labels (bool): Give True if folder name is a label name else False.
-        chunk_size (int): chunk size of parallel uploads of inputs and annotations.
+        batch_size (int): chunk size of parallel uploads of inputs and annotations.
 
     Example: TODO
 
@@ -106,7 +101,7 @@ class Dataset(Dataset):
     """
 
     self.upload_from_folder(
-        folder_path=folder_path, input_type=input_type, labels=labels, chunk_size=chunk_size)
+        folder_path=folder_path, input_type=input_type, labels=labels, batch_size=batch_size)
 
   def _get_inputs_from_dataframe(self,
                                  dataframe,
@@ -115,7 +110,6 @@ class Dataset(Dataset):
                                  dataset_id: str = None,
                                  labels: str = True) -> List[Input]:
     input_protos = []
-    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
 
     for row in dataframe.collect():
       if labels:
@@ -157,7 +151,7 @@ class Dataset(Dataset):
 
       if df_type == 'raw':
         input_protos.append(
-            input_obj.get_text_input(
+            self.input_object.get_text_input(
                 input_id=input_id,
                 raw_text=text,
                 dataset_id=dataset_id,
@@ -166,7 +160,7 @@ class Dataset(Dataset):
                 geo_info=geo_info))
       elif df_type == 'url':
         input_protos.append(
-            input_obj.get_input_from_url(
+            self.input_object.get_input_from_url(
                 input_id=input_id,
                 image_url=image,
                 text_url=text,
@@ -178,7 +172,7 @@ class Dataset(Dataset):
                 geo_info=geo_info))
       else:
         input_protos.append(
-            input_obj.get_input_from_file(
+            self.input_object.get_input_from_file(
                 input_id=input_id,
                 image_file=image,
                 text_file=text,
@@ -196,7 +190,7 @@ class Dataset(Dataset):
                                     input_type: str,
                                     df_type: str = None,
                                     labels: bool = True,
-                                    chunk_size: int = 128) -> None:
+                                    batch_size: int = 128) -> None:
     """Uploads dataset from a dataframe.
        Expected columns in the dataframe are inputid, input, concepts (optional), metadata (optional), geopoints (optional).
 
@@ -204,7 +198,7 @@ class Dataset(Dataset):
           dataframe (SparkDataFrame): Spark dataframe with image/text URLs and labels.
           input_type (str): Input type of the dataset whether (Image, text).
           labels (bool): Give True if folder name is a label name else False.
-          chunk_size (int): chunk size of parallel uploads of inputs and annotations.
+          batch_size (int): chunk size of parallel uploads of inputs and annotations.
 
       Example: TODO
     """
@@ -221,39 +215,37 @@ class Dataset(Dataset):
     if not isinstance(dataframe, SparkDataFrame):
       raise UserError('dataframe should be a Spark DataFrame')
 
-    chunk_size = min(128, chunk_size)
-    input_obj = input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
+    batch_size = min(128, batch_size)
     input_protos = self._get_inputs_from_dataframe(
         dataframe=dataframe,
         df_type=df_type,
         input_type=input_type,
         dataset_id=self.dataset_id,
         labels=labels)
-    return (input_obj._bulk_upload(inputs=input_protos, chunk_size=chunk_size))
+    return (self.input_object._bulk_upload(inputs=input_protos, batch_size=batch_size))
 
   def upload_dataset_from_dataloader(self,
-                                     task: str,
-                                     split: str,
-                                     module_dir: str = None,
-                                     chunk_size: int = 128) -> None:
+                                     dataloader: Type[ClarifaiDataLoader],
+                                     batch_size: int = 128,
+                                     get_upload_status: bool = False) -> None:
     """Uploads dataset using a dataloader function for custom formats.
 
     Args:
-        task (str): task type(text_clf, visual-classification, visual_detection, visual_segmentation, visual-captioning).
-        split (str): split type(train, test, val).
-        module_dir (str): path to the module directory.
-        chunk_size (int): chunk size for concurrent upload of inputs and annotations.
+        dataloader (Type[ClarifaiDataLoader]): ClarifaiDataLoader class object.
+        batch_size (int): chunk size for concurrent upload of inputs and annotations.
+        get_upload_status (bool): If True, returns the upload status of the dataset.
 
     Example: TODO
     """
-    self.upload_dataset(task=task, split=split, module_dir=module_dir, chunk_size=chunk_size)
+    self.upload_dataset(
+        dataloader=dataloader, batch_size=batch_size, get_upload_status=get_upload_status)
 
   def upload_dataset_from_table(self,
                                 table_path: str,
                                 input_type: str,
                                 table_type: str,
                                 labels: bool,
-                                chunk_size: int = 128) -> None:
+                                batch_size: int = 128) -> None:
     """upload dataset to clarifai app from spark tables.
 
     Args:
@@ -261,7 +253,7 @@ class Dataset(Dataset):
         input_type (str): Input type of the dataset whether (Image, text).
         table_type (str): Type of the table contents (url, raw, filepath).
         labels (bool): Give True if labels column present in dataset else False.
-        chunk_size (int): chunk size for concurrent upload of inputs and annotations.
+        batch_size (int): chunk size for concurrent upload of inputs and annotations.
 
     Example: TODO
     """
@@ -272,7 +264,7 @@ class Dataset(Dataset):
         input_type=input_type,
         df_type=table_type,
         labels=labels,
-        chunk_size=chunk_size)
+        batch_size=batch_size)
 
   def list_inputs(self, per_page: int = None,
                   input_type: str = None) -> Generator[Input, None, None]:
@@ -285,13 +277,12 @@ class Dataset(Dataset):
     Examples:
         TODO
 
-    Returns:
-        list of inputs.
+    Yield:
+        Input object.
     """
     if input_type not in ('image', 'text'):
       raise UserError('Invalid input type, it should be image or text')
-    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
-    return input_obj.list_inputs(
+    return self.input_object.list_inputs(
         dataset_id=self.dataset_id, input_type=input_type, per_page=per_page)
 
   def list_annotations(self, input_ids: list = None, per_page: int = None,
@@ -307,20 +298,19 @@ class Dataset(Dataset):
     Examples:
         TODO
 
-    Returns:
-        list of annotations.
+    Yeild:
+        Annotation object.
     """
-    ### input_ids: list of input_ids for which user wants annotations
-    input_obj = Inputs(user_id=self.user_id, app_id=self.app_id)
     if not input_ids:
       all_inputs = list(
-          input_obj.list_inputs(
+          self.input_object.list_inputs(
               dataset_id=self.dataset_id, input_type=input_type, per_page=per_page))
     else:
       all_inputs = [
-          input_obj._get_proto(input_id=inpid, dataset_id=self.dataset_id) for inpid in input_ids
+          self.input_object._get_proto(input_id=inpid, dataset_id=self.dataset_id)
+          for inpid in input_ids
       ]
-    return input_obj.list_annotations(batch_input=all_inputs)
+    return self.input_object.list_annotations(batch_input=all_inputs)
 
   def export_annotations_to_dataframe(self, input_ids: list = None, input_type: str = None):
     """Export all the annotations from clarifai App's dataset to spark dataframe.
