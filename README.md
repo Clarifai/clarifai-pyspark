@@ -19,7 +19,7 @@ The initial use case for this SDK revolves around three main objectives:
 
 ## Requirements:
   * Databricks : Runtime 13.3 or later
-  * Clarifai : ` pip install clarifai `
+  * Clarifai : ``` pip install clarifai ```
   * Create your [Clarifai account](https://clarifai.com/login)
   * Protocol Buffers : version 4.24.2 `pip install protobuf==4.24.2 `
 
