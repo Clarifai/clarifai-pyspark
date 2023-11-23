@@ -1,4 +1,5 @@
 from clarifai.client.base import BaseClient
+from clarifai.client.app import App
 
 from clarifaipyspark.dataset import Dataset
 
@@ -9,7 +10,7 @@ class ClarifaiPySpark(BaseClient):
   it initializes the client.
   """
 
-  def __init__(self, user_id: str, app_id: str, pat=None):
+  def __init__(self, user_id: str, app_id: str, pat: str = None):
     """Initializes clarifai client object.
 
     Args:
@@ -19,6 +20,7 @@ class ClarifaiPySpark(BaseClient):
     """
     self.user_id = user_id
     self.app_id = app_id
+    self.app = App(user_id=user_id, app_id=app_id, pat=pat)
     super().__init__(user_id=user_id, app_id=app_id, pat=pat)
 
   def dataset(self, dataset_id):
