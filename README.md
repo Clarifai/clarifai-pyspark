@@ -26,8 +26,10 @@ The initial use case for this SDK revolves around three main objectives:
 ## Setup:
 
 Install the package and initialize the clarifaipyspark class to begin.
-``` python
+```bash
 pip install clarifai-pyspark
+```
+``` python
 from clarifaipyspark.client import ClarifaiPySpark
 ```
 Create a Clarifai-PySpark client object to connect to your app on Clarifai. You can also choose the dataset or create one in your clarifai app to upload the data.
