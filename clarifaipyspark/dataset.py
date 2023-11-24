@@ -19,7 +19,7 @@ class Dataset(Dataset):
   and it inherits from the clarifai SDK Dataset class.
   """
 
-  def __init__(self, user_id: str, app_id: str, dataset_id: str, pat=None):
+  def __init__(self, user_id: str, app_id: str, dataset_id: str, pat: str = None):
     """Initializes the Dataset object.
 
     Args:
@@ -50,7 +50,7 @@ class Dataset(Dataset):
         input_type (str): Input type of the dataset whether (Image, text).
         csv_type (str): Type of the csv file contents(url, raw, filepath).
         labels (bool): Give True if labels column present in dataset else False.
-        batch_size (int): chunk size of parallel uploads of inputs and annotations.
+        batch_size (int): batch size of parallel uploads of inputs and annotations.
 
     Example: TODO
 
@@ -91,7 +91,7 @@ class Dataset(Dataset):
         folder_path (str): folder path of the dataset to be uploaded into clarifai App.
         input_type (str): Input type of the dataset whether (Image, text).
         labels (bool): Give True if folder name is a label name else False.
-        batch_size (int): chunk size of parallel uploads of inputs and annotations.
+        batch_size (int): batch size of parallel uploads of inputs and annotations.
 
     Example: TODO
 
@@ -198,7 +198,7 @@ class Dataset(Dataset):
           dataframe (SparkDataFrame): Spark dataframe with image/text URLs and labels.
           input_type (str): Input type of the dataset whether (Image, text).
           labels (bool): Give True if folder name is a label name else False.
-          batch_size (int): chunk size of parallel uploads of inputs and annotations.
+          batch_size (int): batch size of parallel uploads of inputs and annotations.
 
       Example: TODO
     """
@@ -232,7 +232,7 @@ class Dataset(Dataset):
 
     Args:
         dataloader (Type[ClarifaiDataLoader]): ClarifaiDataLoader class object.
-        batch_size (int): chunk size for concurrent upload of inputs and annotations.
+        batch_size (int): batch size for concurrent upload of inputs and annotations.
         get_upload_status (bool): If True, returns the upload status of the dataset.
 
     Example: TODO
@@ -253,7 +253,7 @@ class Dataset(Dataset):
         input_type (str): Input type of the dataset whether (Image, text).
         table_type (str): Type of the table contents (url, raw, filepath).
         labels (bool): Give True if labels column present in dataset else False.
-        batch_size (int): chunk size for concurrent upload of inputs and annotations.
+        batch_size (int): batch size for concurrent upload of inputs and annotations.
 
     Example: TODO
     """
