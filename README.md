@@ -29,9 +29,11 @@ Install the package and initialize the clarifaipyspark class to begin.
 ```bash
 pip install clarifai-pyspark
 ```
+## Getting Started:
 ``` python
 from clarifaipyspark.client import ClarifaiPySpark
 ```
+
 Create a Clarifai-PySpark client object to connect to your app on Clarifai. You can also choose the dataset or create one in your clarifai app to upload the data.
 ``` python
 claps_obj = ClarifaiPySpark(user_id=USER_ID, app_id=APP_ID)
