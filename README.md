@@ -1,4 +1,4 @@
-# clarifai-pyspark
+# ClarifaiPySpark
 
 ## INTRODUCTION 
 
@@ -21,6 +21,7 @@ The initial use case for this SDK revolves around three main objectives:
   * Databricks : Runtime 13.3 or later
   * Clarifai : ``` pip install clarifai ```
   * Create your [Clarifai account](https://clarifai.com/login)
+  * Follow the instructions to get your own [Clarifai PAT](https://docs.clarifai.com/clarifai-basics/authentication/personal-access-tokens)
   * Protocol Buffers : version 4.24.2 `pip install protobuf==4.24.2 `
 
 ## Setup:
