@@ -1,6 +1,6 @@
 # ClarifaiPySpark
 
-## INTRODUCTION 
+## Introduction
 
 This readme provides overview of the Software Development Kit (SDK) under development for integrating Clarifai with Databricks. The primary use case for this SDK is to facilitate the interaction between Databricks and Clarifai for tasks related to uploading client datasets, annotating data, and exporting and storing annotations in Spark DataFrames or Delta tables.
 
