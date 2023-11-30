@@ -33,6 +33,9 @@ class Dataset(Dataset):
     self.user_id = user_id
     self.app_id = app_id
     self.dataset_id = dataset_id
+    self.spark = spark = SparkSession.builder.appName('Clarifai-pyspark').getOrCreate()
+    # Set Databricks user agent tag
+    self.spark.conf.set("spark.databricks.agent.id", "clarifaipyspark")
     super().__init__(user_id=user_id, app_id=app_id, dataset_id=dataset_id, pat=pat)
 
   def upload_dataset_from_csv(self,
@@ -69,8 +72,7 @@ class Dataset(Dataset):
           labels=labels,
           batch_size=batch_size)
     elif source == "s3":
-      spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
-      df_csv = spark.read.format("csv").option('header', 'true').load(csv_path)
+      df_csv = self.spark.read.format("csv").option('header', 'true').load(csv_path)
       self.upload_dataset_from_dataframe(
           dataframe=df_csv,
           input_type=input_type,
@@ -257,8 +259,7 @@ class Dataset(Dataset):
 
     Example: TODO
     """
-    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
-    tempdf = spark.read.format("delta").load(table_path)
+    tempdf = self.spark.read.format("delta").load(table_path)
     self.upload_dataset_from_dataframe(
         dataframe=tempdf,
         input_type=input_type,
@@ -326,7 +327,6 @@ class Dataset(Dataset):
     """
 
     annotation_list = []
-    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
     response = list(self.list_annotations(input_ids=input_ids, input_type=input_type))
     for an in response:
       temp = {}
@@ -346,7 +346,7 @@ class Dataset(Dataset):
         temp['annotation_created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
         temp['annotation_modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
       annotation_list.append(temp)
-    return spark.createDataFrame(annotation_list)
+    return self.spark.createDataFrame(annotation_list)
 
   def export_images_to_volume(self, path, input_response):
     """Download all the images from clarifai App's dataset to spark volume storage.
@@ -409,7 +409,6 @@ class Dataset(Dataset):
     if input_type not in ('image', 'text'):
       raise UserError('Invalid input type, it should be image or text')
     input_list = []
-    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
     response = list(self.list_inputs(input_type=input_type))
     for inp in response:
       temp = {}
@@ -429,7 +428,7 @@ class Dataset(Dataset):
         temp['input_created_at'] = float(f"{inp.created_at.seconds}.{inp.created_at.nanos}")
         temp['input_modified_at'] = float(f"{inp.modified_at.seconds}.{inp.modified_at.nanos}")
       input_list.append(temp)
-    return spark.createDataFrame(input_list)
+    return self.spark.createDataFrame(input_list)
 
   def export_dataset_to_dataframe(self, input_type, input_ids: list = None):
     """Export all the inputs & their annotations from clarifai App's dataset to spark dataframe.
