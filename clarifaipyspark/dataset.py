@@ -33,7 +33,7 @@ class Dataset(Dataset):
     self.user_id = user_id
     self.app_id = app_id
     self.dataset_id = dataset_id
-    self.spark = spark = SparkSession.builder.appName('Clarifai-pyspark').getOrCreate()
+    self.spark = SparkSession.builder.appName('Clarifai-pyspark').getOrCreate()
     # Set Databricks user agent tag
     self.spark.conf.set("spark.databricks.agent.id", "clarifaipyspark")
     super().__init__(user_id=user_id, app_id=app_id, dataset_id=dataset_id, pat=pat)
