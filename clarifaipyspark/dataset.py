@@ -35,7 +35,7 @@ class Dataset(Dataset):
     self.dataset_id = dataset_id
     self.spark = SparkSession.builder.appName('Clarifai-pyspark').getOrCreate()
     # Set Databricks user agent tag
-    self.spark.conf.set("spark.databricks.agent.id", "clarifaipyspark")
+    self.spark.conf.set("spark.databricks.agent.id", "clarifai-pyspark")
     super().__init__(user_id=user_id, app_id=app_id, dataset_id=dataset_id, pat=pat)
 
   def upload_dataset_from_csv(self,
