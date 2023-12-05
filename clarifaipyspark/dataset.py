@@ -1,6 +1,7 @@
 import json
 import time
 import uuid
+import pandas as pd
 from typing import Generator, List, Type
 
 import requests
@@ -448,3 +449,61 @@ class Dataset(Dataset):
     return inputs_df.join(
         annotations_df, inputs_df.input_id == annotations_df.input_id,
         how='left').drop(annotations_df.input_id)
+  
+  def export_annotations_to_volume(self, volumepath: str, input_type: str = None):
+    """Export all the annotations from clarifai App's dataset to spark dataframe.
+    """
+
+    annotation_list = []
+    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
+
+    my_inputs = list(self.list_inputs(input_type='image'))
+    inp_dict=[]
+    for inp in my_inputs:
+      temp={}
+      temp['input_id']=inp.id
+      temp['image_url'] = inp.data.image.url
+      temp['img_format']= inp.data.image.image_info.format
+      inp_dict.append(temp)
+
+    response = list(self.list_annotations())
+    images_to_download=[]
+    for an in response:
+      temp = {}
+      temp['annotation'] = str(an.data)
+      if not temp['annotation'] or temp['annotation'] == '{}':
+        continue
+      temp['annotation_id'] = an.id
+      temp['annotation_user_id'] = an.user_id
+      temp['input_id'] = an.input_id
+      for val in inp_dict:
+          if an.input_id == val['input_id']:
+             temp['image_url'] = val['image_url']
+             if val not in images_to_download :
+                images_to_download.append(val)
+             
+      try:
+        created_at = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
+        temp['annotation_created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
+        modified_at = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
+        temp['annotation_modified_at'] = time.strftime('%m/%d/% %H:%M:%5',
+                                                       time.gmtime(modified_at))
+      except:
+        temp['annotation_created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
+        temp['annotation_modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
+      annotation_list.append(temp)
+    
+    df_delta = spark.createDataFrame(annotation_list)
+    df_delta.write.format("delta").mode("overwrite").save(volumepath)
+    df_url= pd.DataFrame(images_to_download)
+  
+    for i in range(df_url.shape[0]):
+      imgid = df_url.input_id[i]
+      ext = df_url.img_format[i]
+      url = df_url.image_url[i]
+      img_name = volumepath + '/' + imgid + '.' + ext.lower()
+      print(img_name)
+      headers = {"Authorization": self.metadata[0][1]}
+      response = requests.get(url, headers=headers)
+      with open(img_name, "wb") as f:
+        f.write(response.content)
