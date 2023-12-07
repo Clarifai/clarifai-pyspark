@@ -2,6 +2,7 @@ import json
 import time
 import uuid
 import pandas as pd
+from tqdm import tqdm
 from typing import Generator, List, Type
 
 import requests
@@ -450,8 +451,17 @@ class Dataset(Dataset):
         annotations_df, inputs_df.input_id == annotations_df.input_id,
         how='left').drop(annotations_df.input_id)
   
-  def export_annotations_to_volume(self, volumepath: str, input_type: str = None):
-    """Export all the annotations from clarifai App's dataset to spark dataframe.
+  def export_annotations_to_volume(self, volumepath: str):
+    """Export all the annotations from clarifai App's dataset to UC volume along with annotated images.
+
+    Args:
+        volumepath (str): path of the volume storage where images will be downloaded.
+        
+    Examples:
+        TODO
+    
+    Returns:
+        None. Images are saved into the volume storage.
     """
 
     annotation_list = []
@@ -497,12 +507,11 @@ class Dataset(Dataset):
     df_delta.write.format("delta").mode("overwrite").save(volumepath)
     df_url= pd.DataFrame(images_to_download)
   
-    for i in range(df_url.shape[0]):
+    for i in tqdm(range(df_url.shape[0]), desc="Exporting Images"):
       imgid = df_url.input_id[i]
       ext = df_url.img_format[i]
       url = df_url.image_url[i]
       img_name = volumepath + '/' + imgid + '.' + ext.lower()
-      print(img_name)
       headers = {"Authorization": self.metadata[0][1]}
       response = requests.get(url, headers=headers)
       with open(img_name, "wb") as f:
