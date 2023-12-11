@@ -1,3 +1,4 @@
+import os
 import json
 import time
 import uuid
@@ -6,6 +7,8 @@ from tqdm import tqdm
 from typing import Generator, List, Type
 
 import requests
+from concurrent.futures import ThreadPoolExecutor
+
 from clarifai.client.dataset import Dataset
 from clarifai.datasets.upload.base import ClarifaiDataLoader
 from clarifai.errors import UserError
@@ -507,12 +510,20 @@ class Dataset(Dataset):
     df_delta.write.format("delta").mode("overwrite").save(volumepath)
     df_url= pd.DataFrame(images_to_download)
   
-    for i in tqdm(range(df_url.shape[0]), desc="Exporting Images"):
-      imgid = df_url.input_id[i]
-      ext = df_url.img_format[i]
-      url = df_url.image_url[i]
-      img_name = volumepath + '/' + imgid + '.' + ext.lower()
+    def download_image(args):
+      i, imgid, ext, url, volumepath= args
+      img_name = os.path.join(volumepath, f"{imgid}.{ext.lower()}")
       headers = {"Authorization": self.metadata[0][1]}
       response = requests.get(url, headers=headers)
+    
       with open(img_name, "wb") as f:
         f.write(response.content)
+    
+      return i
+    
+    args_list = [
+    (i, df_url.input_id[i], df_url.img_format[i], df_url.image_url[i], volumepath)
+    for i in range(df_url.shape[0])]
+
+    with ThreadPoolExecutor(max_workers=5) as executor:  # Adjust max_workers 
+      results = list(tqdm(executor.map(download_image, args_list), total=len(args_list), desc="Exporting Images"))
