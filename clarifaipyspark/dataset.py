@@ -7,7 +7,7 @@ from tqdm import tqdm
 from typing import Generator, List, Type
 
 import requests
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from clarifai.client.dataset import Dataset
 from clarifai.datasets.upload.base import ClarifaiDataLoader
@@ -471,13 +471,12 @@ class Dataset(Dataset):
     spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
 
     my_inputs = list(self.list_inputs(input_type='image'))
-    inp_dict=[]
+    inp_dict={}
     for inp in my_inputs:
       temp={}
-      temp['input_id']=inp.id
       temp['image_url'] = inp.data.image.url
       temp['img_format']= inp.data.image.image_info.format
-      inp_dict.append(temp)
+      inp_dict[inp.id]=temp
 
     response = list(self.list_annotations())
     images_to_download=[]
@@ -489,11 +488,12 @@ class Dataset(Dataset):
       temp['annotation_id'] = an.id
       temp['annotation_user_id'] = an.user_id
       temp['input_id'] = an.input_id
-      for val in inp_dict:
-          if an.input_id == val['input_id']:
-             temp['image_url'] = val['image_url']
-             if val not in images_to_download :
-                images_to_download.append(val)
+      temp['image_url'] = inp_dict[an.input_id]['image_url']
+      if temp['input_id'] not in images_to_download :
+        val={"input_id":an.input_id}
+        val.update(inp_dict[an.input_id])
+        images_to_download.append(val)
+      
              
       try:
         created_at = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
@@ -509,9 +509,10 @@ class Dataset(Dataset):
     df_delta = spark.createDataFrame(annotation_list)
     df_delta.write.format("delta").mode("overwrite").save(volumepath)
     df_url= pd.DataFrame(images_to_download)
+    df_len=df_url.shape[0]
   
     def download_image(args):
-      i, imgid, ext, url, volumepath= args
+      i, imgid, ext, url, volumepath = args
       img_name = os.path.join(volumepath, f"{imgid}.{ext.lower()}")
       headers = {"Authorization": self.metadata[0][1]}
       response = requests.get(url, headers=headers)
@@ -523,7 +524,14 @@ class Dataset(Dataset):
     
     args_list = [
     (i, df_url.input_id[i], df_url.img_format[i], df_url.image_url[i], volumepath)
-    for i in range(df_url.shape[0])]
+    for i in range(df_len)]
 
-    with ThreadPoolExecutor(max_workers=5) as executor:  # Adjust max_workers 
-      results = list(tqdm(executor.map(download_image, args_list), total=len(args_list), desc="Exporting Images"))
+    with ThreadPoolExecutor(max_workers=5) as executor: 
+      with tqdm(total=df_len, desc='Exporting Images') as progress:
+        futures = [
+            executor.submit(download_image, args)
+            for args in args_list
+        ]
+        for job in as_completed(futures):
+            result = job.result()
+            progress.update()
