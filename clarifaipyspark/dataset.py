@@ -1,9 +1,14 @@
+import os
 import json
 import time
 import uuid
+import pandas as pd
+from tqdm import tqdm
 from typing import Generator, List, Type
 
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from clarifai.client.dataset import Dataset
 from clarifai.datasets.upload.base import ClarifaiDataLoader
 from clarifai.errors import UserError
@@ -33,6 +38,9 @@ class Dataset(Dataset):
     self.user_id = user_id
     self.app_id = app_id
     self.dataset_id = dataset_id
+    self.spark = SparkSession.builder.appName('Clarifai-pyspark').getOrCreate()
+    # Set Databricks user agent tag
+    self.spark.conf.set("spark.databricks.agent.id", "clarifai-pyspark")
     super().__init__(user_id=user_id, app_id=app_id, dataset_id=dataset_id, pat=pat)
 
   def upload_dataset_from_csv(self,
@@ -69,8 +77,7 @@ class Dataset(Dataset):
           labels=labels,
           batch_size=batch_size)
     elif source == "s3":
-      spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
-      df_csv = spark.read.format("csv").option('header', 'true').load(csv_path)
+      df_csv = self.spark.read.format("csv").option('header', 'true').load(csv_path)
       self.upload_dataset_from_dataframe(
           dataframe=df_csv,
           input_type=input_type,
@@ -257,8 +264,7 @@ class Dataset(Dataset):
 
     Example: TODO
     """
-    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
-    tempdf = spark.read.format("delta").load(table_path)
+    tempdf = self.spark.read.format("delta").load(table_path)
     self.upload_dataset_from_dataframe(
         dataframe=tempdf,
         input_type=input_type,
@@ -326,7 +332,6 @@ class Dataset(Dataset):
     """
 
     annotation_list = []
-    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
     response = list(self.list_annotations(input_ids=input_ids, input_type=input_type))
     for an in response:
       temp = {}
@@ -346,7 +351,7 @@ class Dataset(Dataset):
         temp['annotation_created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
         temp['annotation_modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
       annotation_list.append(temp)
-    return spark.createDataFrame(annotation_list)
+    return self.spark.createDataFrame(annotation_list)
 
   def export_images_to_volume(self, path, input_response):
     """Download all the images from clarifai App's dataset to spark volume storage.
@@ -409,7 +414,6 @@ class Dataset(Dataset):
     if input_type not in ('image', 'text'):
       raise UserError('Invalid input type, it should be image or text')
     input_list = []
-    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
     response = list(self.list_inputs(input_type=input_type))
     for inp in response:
       temp = {}
@@ -429,7 +433,7 @@ class Dataset(Dataset):
         temp['input_created_at'] = float(f"{inp.created_at.seconds}.{inp.created_at.nanos}")
         temp['input_modified_at'] = float(f"{inp.modified_at.seconds}.{inp.modified_at.nanos}")
       input_list.append(temp)
-    return spark.createDataFrame(input_list)
+    return self.spark.createDataFrame(input_list)
 
   def export_dataset_to_dataframe(self, input_type, input_ids: list = None):
     """Export all the inputs & their annotations from clarifai App's dataset to spark dataframe.
@@ -449,3 +453,85 @@ class Dataset(Dataset):
     return inputs_df.join(
         annotations_df, inputs_df.input_id == annotations_df.input_id,
         how='left').drop(annotations_df.input_id)
+  
+  def export_annotations_to_volume(self, volumepath: str):
+    """Export all the annotations from clarifai App's dataset to UC volume along with annotated images.
+
+    Args:
+        volumepath (str): path of the volume storage where images will be downloaded.
+        
+    Examples:
+        TODO
+    
+    Returns:
+        None. Images are saved into the volume storage.
+    """
+
+    annotation_list = []
+    spark = SparkSession.builder.appName('Clarifai-spark').getOrCreate()
+
+    my_inputs = list(self.list_inputs(input_type='image'))
+    inp_dict={}
+    for inp in my_inputs:
+      temp={}
+      temp['image_url'] = inp.data.image.url
+      temp['img_format']= inp.data.image.image_info.format
+      inp_dict[inp.id]=temp
+
+    response = list(self.list_annotations())
+    images_to_download=[]
+    for an in response:
+      temp = {}
+      temp['annotation'] = str(an.data)
+      if not temp['annotation'] or temp['annotation'] == '{}':
+        continue
+      temp['annotation_id'] = an.id
+      temp['annotation_user_id'] = an.user_id
+      temp['input_id'] = an.input_id
+      temp['image_url'] = inp_dict[an.input_id]['image_url']
+      if temp['input_id'] not in images_to_download :
+        val={"input_id":an.input_id}
+        val.update(inp_dict[an.input_id])
+        images_to_download.append(val)
+      
+             
+      try:
+        created_at = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
+        temp['annotation_created_at'] = time.strftime('%m/%d/% %H:%M:%5', time.gmtime(created_at))
+        modified_at = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
+        temp['annotation_modified_at'] = time.strftime('%m/%d/% %H:%M:%5',
+                                                       time.gmtime(modified_at))
+      except:
+        temp['annotation_created_at'] = float(f"{an.created_at.seconds}.{an.created_at.nanos}")
+        temp['annotation_modified_at'] = float(f"{an.modified_at.seconds}.{an.modified_at.nanos}")
+      annotation_list.append(temp)
+    
+    df_delta = spark.createDataFrame(annotation_list)
+    df_delta.write.format("delta").mode("overwrite").save(volumepath)
+    df_url= pd.DataFrame(images_to_download)
+    df_len=df_url.shape[0]
+  
+    def download_image(args):
+      i, imgid, ext, url, volumepath = args
+      img_name = os.path.join(volumepath, f"{imgid}.{ext.lower()}")
+      headers = {"Authorization": self.metadata[0][1]}
+      response = requests.get(url, headers=headers)
+    
+      with open(img_name, "wb") as f:
+        f.write(response.content)
+    
+      return i
+    
+    args_list = [
+    (i, df_url.input_id[i], df_url.img_format[i], df_url.image_url[i], volumepath)
+    for i in range(df_len)]
+
+    with ThreadPoolExecutor(max_workers=5) as executor: 
+      with tqdm(total=df_len, desc='Exporting Images') as progress:
+        futures = [
+            executor.submit(download_image, args)
+            for args in args_list
+        ]
+        for job in as_completed(futures):
+            result = job.result()
+            progress.update()
