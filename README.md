@@ -45,8 +45,8 @@ dataset_obj = claps_obj.dataset(dataset_id=DATASET_ID)
 Checkout these notebooks for various operations you can perform using clarifai-pyspark SDK.
 | Notebook | **Description** |  GitHub |
 |----------|--------|---------------- |
-| ClarifaiPyspark_Example_NB | An extensive notebook which walks through the journey from data ingestion to exporting annotations | [![GitHub](https://img.shields.io/badge/GitHub-Link-blue?logo=github)]((https://github.com/Clarifai/clarifai-pyspark/blob/main/examples/ClarifaiPyspark_Example_NB.ipynb)) |
-| export_to_df_demo | Explains the process of exporting annotations from clarifai app and storing it as dataframe in databricks |  [![GitHub](https://img.shields.io/badge/GitHub-Link-blue?logo=github)]((https://github.com/Clarifai/clarifai-pyspark/blob/main/examples/export_to_df_demo.ipynb)) |
+| ClarifaiPyspark_Example_NB | An extensive notebook which walks through the journey from data ingestion to exporting annotations | [![GitHub](https://img.shields.io/badge/GitHub-Link-blue?logo=github)](https://github.com/Clarifai/clarifai-pyspark/blob/main/examples/ClarifaiPyspark_Example_NB.ipynb) |
+| export_to_df_demo | Explains the process of exporting annotations from clarifai app and storing it as dataframe in databricks |  [![GitHub](https://img.shields.io/badge/GitHub-Link-blue?logo=github)](https://github.com/Clarifai/clarifai-pyspark/blob/main/examples/export_to_df_demo.ipynb) |
 
 ##
 If you want to enhance your AI journey with workflows and leveraging custom models (programmatically) our [Clarifai SDK](https://docs.clarifai.com/python-sdk/tutorial) might be good place to start with.
