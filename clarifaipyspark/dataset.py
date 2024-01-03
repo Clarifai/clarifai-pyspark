@@ -10,10 +10,12 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from clarifai.client.dataset import Dataset
+from clarifai.client.search import Search
 from clarifai.datasets.upload.base import ClarifaiDataLoader
 from clarifai.errors import UserError
 from clarifai_grpc.grpc.api.resources_pb2 import Annotation, Input
 from google.protobuf.struct_pb2 import Struct
+from google.protobuf.json_format import MessageToDict
 from pyspark.sql import DataFrame as SparkDataFrame
 from pyspark.sql import SparkSession
 
@@ -413,9 +415,13 @@ class Dataset(Dataset):
     """
     if input_type not in ('image', 'text'):
       raise UserError('Invalid input type, it should be image or text')
-    input_list = []
-    response = list(self.list_inputs(input_type=input_type))
-    for inp in response:
+    
+    search_obj = Search(user_id=self.user_id, app_id=self.app_id)
+    search_response = search_obj.query(filters=[{"input_types":["image"]},{"input_dataset_ids":[self.dataset_id]}])
+    inputs=[hit.input for response in search_response for hit in response.hits]
+
+    input_list=[]
+    for inp in inputs:
       temp = {}
       temp['input_id'] = inp.id
       if input_type == 'image':
@@ -432,9 +438,13 @@ class Dataset(Dataset):
       except:
         temp['input_created_at'] = float(f"{inp.created_at.seconds}.{inp.created_at.nanos}")
         temp['input_modified_at'] = float(f"{inp.modified_at.seconds}.{inp.modified_at.nanos}")
+      try:
+        temp['input_metadata'] = str(MessageToDict(inp.data.metadata))
+      except:
+        temp['input_metadata'] = None
       input_list.append(temp)
     return self.spark.createDataFrame(input_list)
-
+  
   def export_dataset_to_dataframe(self, input_type, input_ids: list = None):
     """Export all the inputs & their annotations from clarifai App's dataset to spark dataframe.
 
