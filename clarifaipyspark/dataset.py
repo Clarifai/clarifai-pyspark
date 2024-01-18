@@ -337,7 +337,7 @@ class Dataset(Dataset):
     response = list(self.list_annotations(input_ids=input_ids, input_type=input_type))
     for an in response:
       temp = {}
-      temp['annotation'] = str(an.data.regions) if an.data.regions else {}
+      temp['annotation'] = str(an.data) if not an.data.metadata else {}
       if not temp['annotation'] or temp['annotation'] == '{}':
         continue
       temp['annotation_id'] = an.id
@@ -489,7 +489,7 @@ class Dataset(Dataset):
     images_to_download=[]
     for an in response:
       temp = {}
-      temp['annotation'] = str(an.data)
+      temp['annotation'] = str(an.data) if not an.data.metadata else {}
       if not temp['annotation'] or temp['annotation'] == '{}':
         continue
       temp['annotation_id'] = an.id
