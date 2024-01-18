@@ -1,2 +1,2 @@
-clarifai==9.10.3
+clarifai==10.0.1
 pyspark==3.5.0

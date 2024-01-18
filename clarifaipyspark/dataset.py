@@ -337,7 +337,7 @@ class Dataset(Dataset):
     response = list(self.list_annotations(input_ids=input_ids, input_type=input_type))
     for an in response:
       temp = {}
-      temp['annotation'] = str(an.data)
+      temp['annotation'] = str(an.data) if not an.data.metadata else {}
       if not temp['annotation'] or temp['annotation'] == '{}':
         continue
       temp['annotation_id'] = an.id
@@ -415,11 +415,8 @@ class Dataset(Dataset):
     """
     if input_type not in ('image', 'text'):
       raise UserError('Invalid input type, it should be image or text')
-    
-    search_obj = Search(user_id=self.user_id, app_id=self.app_id, pat=self.pat)
-    search_response = search_obj.query(filters=[{"input_types":["image"]},{"input_dataset_ids":[self.dataset_id]}])
-    inputs=[hit.input for response in search_response for hit in response.hits]
-
+  
+    inputs= list(self.list_inputs(input_type=input_type))
     input_list=[]
     for inp in inputs:
       temp = {}
@@ -492,7 +489,7 @@ class Dataset(Dataset):
     images_to_download=[]
     for an in response:
       temp = {}
-      temp['annotation'] = str(an.data)
+      temp['annotation'] = str(an.data) if not an.data.metadata else {}
       if not temp['annotation'] or temp['annotation'] == '{}':
         continue
       temp['annotation_id'] = an.id
