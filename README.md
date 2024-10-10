@@ -1,5 +1,6 @@
-# ClarifaiPySpark
+![image](https://github.com/user-attachments/assets/66211e6f-4819-4edd-83e0-5a2e91087f7d)
 
+# ClarifaiPySpark
 
 ## Introduction
 
