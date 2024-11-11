@@ -1,8 +1,10 @@
 from clarifai.client.base import BaseClient
 from clarifai.client.app import App
-
+from clarifai import __version__
 from clarifaipyspark.dataset import Dataset
 
+REQUEST_ID_PREFIX_HEADER = "x-clarifai-request-id-prefix"
+REQUEST_ID_PREFIX = f"sdk-pyspark-{__version__}"
 
 class ClarifaiPySpark(BaseClient):
   """
@@ -22,6 +24,12 @@ class ClarifaiPySpark(BaseClient):
     self.app_id = app_id
     self.app = App(user_id=user_id, app_id=app_id, pat=pat)
     super().__init__(user_id=user_id, app_id=app_id, pat=pat)
+    if pat:
+      self.metadata =  (("authorization", "Key %s" % pat), (REQUEST_ID_PREFIX_HEADER,
+                                                        REQUEST_ID_PREFIX))
+    else:
+      raise Exception("'token' or 'pat' needed to be provided in the query params or env vars.")
+    
 
   def dataset(self, dataset_id):
     """Initializes the dataset method with dataset_id.
